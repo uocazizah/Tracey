@@ -18,6 +18,7 @@
 *.pch
 
 # Libraries
+# *.lib
 *.a
 *.la
 *.lo
@@ -141,7 +142,7 @@ dist/
 downloads/
 eggs/
 .eggs/
-lib/
+# lib/
 lib64/
 parts/
 sdist/
