@@ -1,3 +1,5 @@
-# tracey
+tracey
+-------
 
-compiler for Tracey (.trc) programming language 
+compiler for Tracey (.trc) programming language.
+A low-level safety language for safe memory allocation and safer language
