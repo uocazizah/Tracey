@@ -4,23 +4,41 @@ on:
   pull_request:
 
 jobs:
-  test:
+  build-and-test:
     runs-on: codeberg-small-lazy
+
+    strategy:
+      fail-fast: false
+      matrix:
+        compiler:
+          - gcc
+          - clang
 
     container:
       image: archlinux:latest
 
     steps:
       - name: Install base tools
-        run: pacman -Syu --noconfirm git nodejs npm gcc clang make cmake
+        run: |
+          pacman -Syu --noconfirm \
+            git \
+            nodejs \
+            npm \
+            gcc \
+            clang \
+            make \
+            cmake
 
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: compile
+      - name: Compile (${{ matrix.compiler }})
         working-directory: bootstrap
-        run: make -f GNUmake -j 2
+        run: |
+          make -f GNUmake clean
+          make -f GNUmake CC=${{ matrix.compiler }} -j2
 
-      - name: Run
+      - name: Test (${{ matrix.compiler }})
         working-directory: bootstrap
-        run: ./bin/traceyc index.trc -o app -Wall
+        run: |
+          ./bin/traceyc index.trc -o app -Wall
