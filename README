@@ -1,5 +1,55 @@
-tracey
--------
+Tracey
+---------
 
-compiler for Tracey (.trc) programming language.
-A low-level safety language for safe memory allocation and safer language
+Tracey is a compiler for the Tracey programming language (`.trc`).
+
+Tracey aims to be a low-level systems programming language that provides
+greater memory safety while maintaining performance and control close to
+traditional native languages.
+
+Project Status
+-----------------
+
+Tracey is currently in the bootstrap stage.
+
+The compiler is under active development and is not yet considered stable.
+Language syntax, compiler internals, and project structure may change
+frequently until the first public release.
+
+Repository Structure
+-----------------------
+bootstrap/    Bootstrap compiler
+
+general/      Source Code
+dependencies/ External dependencies
+docs/         Documentation
+etc/          Project configuration files
+include/      Global include file
+lib/          Standard Library
+runtime/      Mini runtime
+test/         Testing compiler
+bin/          Build output
+
+(This structure apply to bootstrap directory too)
+
+Development
+--------------
+
+Tracey is currently being developed using C.
+
+Current focus:
+
+- Command-line interface
+- Source file handling
+- Lexer
+- Parser
+- Semantic analysis
+- Code generation
+
+Contributing
+---------------
+
+Contributions, bug reports, and suggestions are welcome.
+
+As the language is still in early development, breaking changes may occur
+without notice.
