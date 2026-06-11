@@ -35,8 +35,8 @@ jobs:
       - name: Compile (${{ matrix.compiler }})
         working-directory: bootstrap
         run: |
-          make -f GNUmake clean
-          make -f GNUmake CC=${{ matrix.compiler }} -j2
+          make clean
+          make CC=${{ matrix.compiler }} -j2
 
       - name: Test (${{ matrix.compiler }})
         working-directory: bootstrap
