@@ -1,5 +1,5 @@
 CC      := cc
-CFLAGS  := -Wall -Wextra -std=c11 -Iinclude
+CFLAGS  := -Wall -Wextra -std=c11 -Iinclude -g -O0
 
 TARGET  := bin/traceyc
 
