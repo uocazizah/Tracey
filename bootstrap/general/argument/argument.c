@@ -1,6 +1,6 @@
 #include <stdio.h>
 #include <string.h>
-#include <tracey/argument/args.h>
+#include <tracey/argument/argument.h>
 
 int parse_args(int argc, char **argv, TraceyOptions *opts) {
     for (int i = 1; i < argc; i++) {
