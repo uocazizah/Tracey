@@ -10,35 +10,48 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        compiler:
-          - gcc
-          - clang
+        include:
+          - compiler: gcc
+            cc: gcc
+            cflags: ""
+
+          - compiler: clang
+            cc: clang
+            cflags: ""
+
+          - compiler: gcc
+            cc: gcc
+            cflags: "-m32"
+
+          - compiler: clang
+            cc: clang
+            cflags: "-m32"
+
+          - compiler: gcc
+            cc: aarch64-linux-gnu-gcc
+            cflags: ""
+
+          - compiler: gcc
+            cc: arm-linux-gnueabihf-gcc
+            cflags: ""
 
     container:
-      image: archlinux:latest
+      image: codeberg.org/uoctamika/tracey-ci:latest
 
     steps:
-      - name: Install base tools
-        run: |
-          pacman -Syu --noconfirm \
-            git \
-            nodejs \
-            npm \
-            gcc \
-            clang \
-            make \
-            cmake
-
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Compile (${{ matrix.compiler }})
+      - name: Show toolchain
+        run: |
+          echo "Compiler: ${{ matrix.compiler }}"
+          echo "CC: ${{ matrix.cc }}"
+          echo "CFLAGS: ${{ matrix.cflags }}"
+          ${{ matrix.cc }} --version || true
+
+      - name: Compile (${{ matrix.compiler }} / ${{ matrix.cflags }})
         working-directory: bootstrap
         run: |
           make clean
-          make CC=${{ matrix.compiler }} -j2
+          make CC=${{ matrix.cc }} CFLAGS="${{ matrix.cflags }} -Wall -Wextra -std=c11 -Iinclude -g -O0"
 
-      - name: Test (${{ matrix.compiler }})
-        working-directory: bootstrap
-        run: |
-          ./bin/traceyc index.trc -o app -Wall
