@@ -7,38 +7,67 @@ jobs:
   build-and-test:
     runs-on: codeberg-small-lazy
 
+    container:
+      image: codeberg.org/uoctamika/tracey-ci:latest
+
     strategy:
       fail-fast: false
-      matrix:
-        compiler:
-          - gcc
-          - clang
 
-    container:
-      image: archlinux:latest
+      matrix:
+        include:
+          - name: gcc-x86_64
+            cc: gcc
+            arch: x86_64
+
+          - name: clang-x86_64
+            cc: clang
+            arch: x86_64
+
+          - name: gcc-i686
+            cc: gcc
+            arch: i686
+
+          - name: clang-i686
+            cc: clang
+            arch: i686
+
+          - name: gcc-aarch64
+            cc: aarch64-linux-gnu-gcc
+            arch: aarch64
+
+          - name: gcc-armhf
+            cc: arm-linux-gnueabihf-gcc
+            arch: armhf
+
+    name: ${{ matrix.name }}
 
     steps:
-      - name: Install base tools
-        run: |
-          pacman -Syu --noconfirm \
-            git \
-            nodejs \
-            npm \
-            gcc \
-            clang \
-            make \
-            cmake
-
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Compile (${{ matrix.compiler }})
+      - name: Toolchain information
+        run: |
+          echo "Compiler : ${{ matrix.cc }}"
+          echo "Arch     : ${{ matrix.arch }}"
+
+          ${{ matrix.cc }} --version
+
+      - name: Build
         working-directory: bootstrap
         run: |
           make clean
-          make CC=${{ matrix.compiler }} -j2
 
-      - name: Test (${{ matrix.compiler }})
+          make \
+            CC=${{ matrix.cc }} \
+            ARCH=${{ matrix.arch }}
+
+      - name: Verify binary
+        working-directory: bootstrap
+        run: |
+          file bin/traceyc
+
+      - name: Run test
+        if: matrix.arch == 'x86_64' || matrix.arch == 'i686'
         working-directory: bootstrap
         run: |
           ./bin/traceyc index.trc -o app -Wall
