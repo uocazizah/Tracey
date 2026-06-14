@@ -7,51 +7,67 @@ jobs:
   build-and-test:
     runs-on: archlinux
 
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - compiler: gcc
-            cc: gcc
-            cflags: ""
-
-          - compiler: clang
-            cc: clang
-            cflags: ""
-
-          - compiler: gcc
-            cc: gcc
-            cflags: "-m32"
-
-          - compiler: clang
-            cc: clang
-            cflags: "-m32"
-
-          - compiler: gcc
-            cc: aarch64-linux-gnu-gcc
-            cflags: ""
-
-          - compiler: gcc
-            cc: arm-linux-gnueabihf-gcc
-            cflags: ""
-
     container:
       image: codeberg.org/uoctamika/tracey-ci:latest
+
+    strategy:
+      fail-fast: false
+
+      matrix:
+        include:
+          - name: gcc-x86_64
+            cc: gcc
+            arch: x86_64
+
+          - name: clang-x86_64
+            cc: clang
+            arch: x86_64
+
+          - name: gcc-i686
+            cc: gcc
+            arch: i686
+
+          - name: clang-i686
+            cc: clang
+            arch: i686
+
+          - name: gcc-aarch64
+            cc: aarch64-linux-gnu-gcc
+            arch: aarch64
+
+          - name: gcc-armhf
+            cc: arm-linux-gnueabihf-gcc
+            arch: armhf
+
+    name: ${{ matrix.name }}
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Show toolchain
+      - name: Toolchain information
         run: |
-          echo "Compiler: ${{ matrix.compiler }}"
-          echo "CC: ${{ matrix.cc }}"
-          echo "CFLAGS: ${{ matrix.cflags }}"
-          ${{ matrix.cc }} --version || true
+          echo "Compiler : ${{ matrix.cc }}"
+          echo "Arch     : ${{ matrix.arch }}"
 
-      - name: Compile (${{ matrix.compiler }} / ${{ matrix.cflags }})
+          ${{ matrix.cc }} --version
+
+      - name: Build
         working-directory: bootstrap
         run: |
           make clean
-          make CC=${{ matrix.cc }} CFLAGS="${{ matrix.cflags }} -Wall -Wextra -std=c11 -Iinclude -g -O0"
 
+          make \
+            CC=${{ matrix.cc }} \
+            ARCH=${{ matrix.arch }}
+
+      - name: Verify binary
+        working-directory: bootstrap
+        run: |
+          file bin/traceyc
+
+      - name: Run test
+        if: matrix.arch == 'x86_64' || matrix.arch == 'i686'
+        working-directory: bootstrap
+        run: |
+          ./bin/traceyc index.trc -o app -Wall
