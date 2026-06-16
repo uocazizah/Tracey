@@ -1,0 +1,11 @@
+when:
+  - event: pull_request
+
+steps:
+  - name: testing
+    image: archlinux:latest
+    directory: bootstrap
+    commands:
+      - pacman -Syu --noconfirm gcc make git curl
+      - make
+      - ./bin/traceyc index.trc -o app -Wall
