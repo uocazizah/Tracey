@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <string.h>
+#include <tracey/error/error.h>
 #include <tracey/argument/argument.h>
 
 static int has_trc_extension(const char *filename)
@@ -35,13 +36,14 @@ int parse_args(int argc, char **argv, TraceyOptions *opts)
     }
 
     if (!opts->input_file) {
-        fprintf(stderr, "no input file specified\ncompilation terminated.\n");
+        warning("no input file specified");
+        fatal("compilation terminated");
         return 0;
     }
 
     if (!has_trc_extension(opts->input_file)) {
-        fprintf(stderr, "input file '%s' is not valid\ncompilation terminated.\n",
-                       opts->input_file);
+        warning("input file '%s' is not valid", opts->input_file);
+        fatal("compilation terminated");
         return 0;
     }
 
