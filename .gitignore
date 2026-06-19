@@ -1,4 +1,19 @@
 # ---> C
+
+# auto build bootstrap
+bootstrap/aclocal.m4
+bootstrap/configure
+bootstrap/GNUmakefile.in
+bootstrap/config.h.in
+bootstrap/compile
+bootstrap/depcomp
+bootstrap/install-sh
+bootstrap/missing
+bootstrap/autom4te.cache/
+bootstrap/build/
+bootstrap/*~
+bootstrap/*.cp
+
 # Prerequisites
 *.d
 
