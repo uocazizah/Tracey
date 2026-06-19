@@ -24,4 +24,4 @@ steps:
       - mkdir -p build && cd build
       - ../configure
       - make V=1
-      - .traceyc ../index.trc -o app -Wall
+      - ./traceyc ../index.trc -o app -Wall
