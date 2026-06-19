@@ -1,0 +1,15 @@
+AM_CPPFLAGS = -I$(top_srcdir)/include
+
+AM_CFLAGS = -Wall -Wextra -std=c11 -g -O0
+
+bin_PROGRAMS = traceyc
+
+traceyc_SOURCES = \
+    index.c \
+    general/argument/argument.c \
+    general/argument/debug_print_args.c \
+    general/compile/compiler_pipeline.c \
+    general/error/normal_error.c \
+    general/file/debug_print_file.c \
+    general/file/file_close.c \
+    general/file/file_open.c
