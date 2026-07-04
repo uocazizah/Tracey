@@ -6,8 +6,10 @@ AC_CONFIG_HEADERS([config.h])
 AM_INIT_AUTOMAKE([foreign subdir-objects silent-rules])
 
 AM_SILENT_RULES([yes])
+
 : ${CFLAGS="-g -O0"}
-dnl AC_PROG_CXXCPP
+
+AC_PROG_CXXCPP
 
 AC_CHECK_HEADERS([
 cstdio
