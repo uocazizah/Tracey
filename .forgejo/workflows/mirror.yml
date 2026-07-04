@@ -19,14 +19,6 @@ jobs:
             url: ${{ vars.MIRROR_1_URL }}
             host: ${{ vars.MIRROR_1_HOST }}
 
-          - name: gitlab
-            url: ${{ vars.MIRROR_2_URL }}
-            host: ${{ vars.MIRROR_2_HOST }}
-
-          - name: codeberg
-            url: ${{ vars.MIRROR_3_URL }}
-            host: ${{ vars.MIRROR_3_HOST }}
-
     steps:
       - name: Setup Tools
         run: pacman -Syu --noconfirm git nodejs npm
