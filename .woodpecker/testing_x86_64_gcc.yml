@@ -1,0 +1,15 @@
+when:
+  - event: pull_request
+
+steps:
+  - name: testing_x86_64_gcc
+    image: archlinux:latest
+    directory: bootstrap
+    commands:
+      - pacman-key --init
+      - pacman -Syu --noconfirm gcc make automake libtool autoconf
+      - autoreconf -fi
+      - mkdir -p build && cd build
+      - ../configure
+      - make V=1
+      - ./traceyc ../index.trc -o app -Wall
