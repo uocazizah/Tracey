@@ -7,7 +7,7 @@ AM_INIT_AUTOMAKE([foreign subdir-objects silent-rules])
 
 AM_SILENT_RULES([yes])
 
-: ${CFLAGS="-g -O0"}
+: ${CXXFLAGS="-g -O0"}
 
 AC_PROG_CXXCPP
 
