@@ -1,17 +1,21 @@
 AC_INIT([tracey], [1.0], [uoctamika.codeberg.org@gmail.com])
 
-AC_CONFIG_SRCDIR([index.c])
+AC_CONFIG_SRCDIR([index.cxx])
 AC_CONFIG_HEADERS([config.h])
 
 AM_INIT_AUTOMAKE([foreign subdir-objects silent-rules])
 
 AM_SILENT_RULES([yes])
 : ${CFLAGS="-g -O0"}
-dnl AC_PROG_CC
+dnl AC_PROG_CXXCPP
 
 AC_CHECK_HEADERS([
-stdbool.h
-stdnoreturn.h
+cstdio
+cstdlib
+cstring
+cstdint
+cstdbool
+cstdnoreturn
 ])
 
 AC_ARG_VAR(
