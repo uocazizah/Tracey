@@ -1,5 +1,5 @@
 #include <cstdarg>
-#include <cstdbool>
+/* #include <cstdbool> */
 #include <cstdio>
 #include <cstdlib>
 
