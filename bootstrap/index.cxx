@@ -3,7 +3,7 @@
 
 int main(int argc, char **argv)
 {
-    TraceyOptions opts = {0};
+    TraceyOptions opts = {};
 
    if(!parse_args(argc, argv, &opts))
    {
