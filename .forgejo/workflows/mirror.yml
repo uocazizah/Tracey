@@ -1,0 +1,72 @@
+name: Mirror to Multiple Repositories
+
+on:
+  push:
+    branches:
+      - master
+
+jobs:
+  mirror:
+    runs-on: codeberg-tiny-lazy
+    container:
+      image: archlinux:latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        mirror:
+          - name: github
+            url: ${{ vars.MIRROR_1_URL }}
+            host: ${{ vars.MIRROR_1_HOST }}
+
+          - name: gitlab
+            url: ${{ vars.MIRROR_2_URL }}
+            host: ${{ vars.MIRROR_2_HOST }}
+
+          - name: codeberg
+            url: ${{ vars.MIRROR_3_URL }}
+            host: ${{ vars.MIRROR_3_HOST }}
+
+    steps:
+      - name: Setup Tools
+        run: pacman -Syu --noconfirm git nodejs npm
+
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Git
+        run: |
+          git config --global user.name "${{ vars.GIT_USER_NAME }}"
+          git config --global user.email "${{ vars.GIT_USER_EMAIL }}"
+
+      - name: Setup SSH
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+        run: |
+          mkdir -p ~/.ssh
+
+          echo "$SSH_PRIVATE_KEY" > ~/.ssh/id_ed25519
+
+          chmod 700 ~/.ssh
+          chmod 600 ~/.ssh/id_ed25519
+
+          ssh-keyscan -H "${{ matrix.mirror.host }}" >> ~/.ssh/known_hosts
+
+          chmod 644 ~/.ssh/known_hosts
+
+      - name: Verify SSH Connection
+        run: |
+          ssh -i ~/.ssh/id_ed25519 \
+              -o StrictHostKeyChecking=yes \
+              -T git@${{ matrix.mirror.host }} || true
+
+      - name: Configure Mirror Remote
+        run: |
+          git remote remove mirror 2>/dev/null || true
+          git remote add mirror "${{ matrix.mirror.url }}"
+
+      - name: Push Mirror
+        run: |
+          git push --mirror mirror
