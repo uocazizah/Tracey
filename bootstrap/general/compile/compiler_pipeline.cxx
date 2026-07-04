@@ -4,7 +4,7 @@
 
 int compile(TraceyOptions *opts)
 {
-    TraceyFile file = {0};
+    TraceyFile file = {};
 
     if (tracey_file_open(&file, opts->input_file) != 0)
     {
