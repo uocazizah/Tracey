@@ -1,6 +1,5 @@
 #include <cstdarg>
 #include <cstdbool>
-#include <cstdnoreturn>
 #include <cstdio>
 #include <cstdlib>
 
@@ -46,7 +45,7 @@ void warning(const char *fmt, ...)
     va_end(args);
 }
 
-noreturn void fatal(const char *fmt, ...)
+[[noreturn]] void fatal(const char *fmt, ...)
 {
     va_list args;
 
