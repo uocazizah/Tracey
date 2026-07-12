@@ -2,15 +2,15 @@
 #include <tracey/compile/compile.hxx>
 #include <tracey/file/file.hxx>
 
-int compile(TraceyOptions *opts)
+int compile(tracey::argument::argument_option *option)
 {
     TraceyFile file = {};
 
-    if (tracey_file_open(&file, opts->input_file) != 0)
+    if (tracey_file_open(&file, option->get_input_file()) != 0)
     {
         fprintf(stderr,
                 "failed to open '%s'\n",
-                opts->input_file);
+                option->get_input_file());
 
         return 1;
     }
