@@ -3,16 +3,16 @@
 
 int main(int argc, char **argv)
 {
-    TraceyOptions opts = {};
+    tracey::argument::argument_option option;
 
-   if(!parse_args(argc, argv, &opts))
+   if(!option.parse_args(argc, argv))
    {
       return 1;
    }
 
-    debug_print_args(&opts);
+    option.debug_print_args();
 
-    compile(&opts);
+    compile(&option);
 
     return 0;
 }
