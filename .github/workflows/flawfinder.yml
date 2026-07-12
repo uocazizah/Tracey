@@ -15,7 +15,7 @@ on:
 jobs:
   flawfinder:
     name: Flawfinder
-    runs-on: ubuntu-slim
+    runs-on: ubuntu-latest
     permissions:
       actions: read
       contents: read
