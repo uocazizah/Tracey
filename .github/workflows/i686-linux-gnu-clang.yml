@@ -1,0 +1,41 @@
+name: Clang i686 Testing
+
+on:
+  pull_request:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            clang \
+            llvm \
+            gcc-i686-linux-gnu \
+            g++-i686-linux-gnu \
+            automake \
+            autoconf \
+            libtool \
+            pkg-config
+
+      - name: Build
+        run: |
+          cd bootstrap
+
+          autoreconf -fiv
+
+          mkdir -p build
+          cd build
+
+          export CC="clang --target=i686-linux-gnu"
+          export CXX="clang++ --target=i686-linux-gnu"
+
+          ../configure \
+            --host=i686-linux-gnu
+
+          make V=1 -j 8

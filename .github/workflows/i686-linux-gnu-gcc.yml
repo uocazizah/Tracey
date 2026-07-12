@@ -1,0 +1,39 @@
+name: GCC i686 Testing
+
+on:
+  pull_request:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            automake \
+            autoconf \
+            libtool \
+            pkg-config \
+            gcc-i686-linux-gnu \
+            g++-i686-linux-gnu
+
+      - name: Build
+        run: |
+          cd bootstrap
+
+          autoreconf -fi
+
+          mkdir -p build
+          cd build
+
+          export CC=i686-linux-gnu-gcc
+          export CXX=i686-linux-gnu-g++
+
+          ../configure \
+            --host=i686-linux-gnu
+
+          make V=1 -j 8
