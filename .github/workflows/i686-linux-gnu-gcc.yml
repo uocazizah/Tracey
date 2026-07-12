@@ -25,7 +25,7 @@ jobs:
         run: |
           cd bootstrap
 
-          autoreconf -fi
+          autoreconf -fiv
 
           mkdir -p build
           cd build
