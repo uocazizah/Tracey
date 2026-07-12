@@ -8,7 +8,7 @@ jobs:
     runs-on: macos-15-intel
 
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
 
       - name: Install tools
         run: |
