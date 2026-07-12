@@ -6,8 +6,13 @@ bin_PROGRAMS = traceyc
 
 traceyc_SOURCES = \
     index.cxx \
-    general/argument/argument.cxx \
-    general/argument/debug_print_args.cxx \
+    general/argument/constructor.cxx \
+    general/argument/parse_argument.cxx \
+    general/argument/debug_print_argument.cxx \
+    general/argument/get_input_file.cxx \
+    general/argument/get_output_file.cxx \
+    general/argument/get_warning_all.cxx \
+    general/argument/get_warning_extra.cxx \
     general/compile/compiler_pipeline.cxx \
     general/error/normal_error.cxx \
     general/file/debug_print_file.cxx \
