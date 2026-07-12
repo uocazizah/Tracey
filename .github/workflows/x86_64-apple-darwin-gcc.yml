@@ -1,0 +1,35 @@
+name: GCC macOS Intel
+
+on:
+  pull_request:
+
+jobs:
+  build:
+    runs-on: macos-15-intel
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Install GCC
+        run: |
+          brew update
+          brew install gcc
+
+      - name: Show environment
+        run: |
+          uname -a
+          uname -m
+          gcc-15 --version
+
+      - name: Build and test
+        run: |
+          cd bootstrap
+          autoreconf -fiv
+          mkdir -p build
+          cd build
+
+          CC=gcc-15 \
+          CXX=g++-15 \
+          ../configure
+
+          make V=1 -j 8
