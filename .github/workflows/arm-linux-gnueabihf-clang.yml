@@ -1,0 +1,41 @@
+name: Clang ARMHF Testing
+
+on:
+  pull_request:
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04-arm
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            clang \
+            llvm \
+            automake \
+            autoconf \
+            libtool \
+            pkg-config \
+            gcc-arm-linux-gnueabihf \
+            g++-arm-linux-gnueabihf
+
+      - name: Build
+        run: |
+          cd bootstrap
+
+          autoreconf -fiv
+
+          mkdir -p build
+          cd build
+
+          export CC="clang --target=arm-linux-gnueabihf"
+          export CXX="clang++ --target=arm-linux-gnueabihf"
+
+          ../configure \
+            --host=arm-linux-gnueabihf
+
+          make V=1 -j 8
