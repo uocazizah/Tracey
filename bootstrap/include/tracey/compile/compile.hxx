@@ -1,5 +1,5 @@
 #pragma once
 
-#include <tracey/struct/args_struct.hxx>
+#include <tracey/argument/argument.hxx>
 
-int compile(TraceyOptions *opts);
+int compile(tracey::argument::argument_option *option);
