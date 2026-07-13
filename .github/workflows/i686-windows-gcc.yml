@@ -1,0 +1,39 @@
+name: GCC X86 Windows Testing
+
+on:
+  pull_request:
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Setup MSYS2
+        uses: msys2/setup-msys2@v2
+        with:
+          update: true
+          install: >-
+            autoconf
+            automake
+            libtool
+            make
+            pkgconf
+            mingw-w64-i686-gcc
+
+      - name: Build
+        shell: msys2 {0}
+        run: |
+          cd bootstrap
+
+          autoreconf -fiv
+
+          mkdir -p build
+          cd build
+
+          ../configure \
+            CC=i686-w64-mingw32-gcc \
+            CXX=i686-w64-mingw32-g++
+
+          make V=1 -j8
