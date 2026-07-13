@@ -13,7 +13,7 @@ jobs:
       - name: Setup MSYS2
         uses: msys2/setup-msys2@v2
         with:
-          msystem: CLANG32
+          msystem: MINGW64
           update: true
           install: >-
             autoconf
@@ -26,6 +26,8 @@ jobs:
       - name: Build
         shell: msys2 {0}
         run: |
+          export PATH="/mingw32/bin:$PATH"
+
           cd bootstrap
 
           autoreconf -fiv
@@ -35,6 +37,7 @@ jobs:
 
           ../configure \
             CC=clang \
-            CXX=clang++
+            CXX=clang++ \
+            --host=i686-w64-mingw32
 
           make V=1 -j8
