@@ -8,12 +8,12 @@ jobs:
     runs-on: windows-latest
 
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
 
       - name: Setup MSYS2
         uses: msys2/setup-msys2@v2
         with:
-          msystem: CLANG64
+          msystem: MINGW32
           update: true
           install: >-
             autoconf
@@ -21,17 +21,11 @@ jobs:
             libtool
             make
             pkgconf
-            mingw-w64-clang-x86_64-clang
-            mingw-w64-i686-gcc
-            mingw-w64-i686-crt
-            mingw-w64-i686-headers
-            mingw-w64-i686-binutils
+            mingw-w64-i686-clang
 
       - name: Build
         shell: msys2 {0}
         run: |
-          export PATH="/clang64/bin:$PATH"
-
           cd bootstrap
 
           autoreconf -fiv
@@ -40,8 +34,7 @@ jobs:
           cd build
 
           ../configure \
-            CC="clang -m32" \
-            CXX="clang++ -m32" \
-            --host=i686-w64-mingw32
+            CC=clang \
+            CXX=clang++
 
-          make V=1 -j$(nproc)
+          make V=1 -j 8
