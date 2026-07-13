@@ -1,4 +1,4 @@
-name: Clang AArch64 Testing
+name: Clang AArch64 Linux GNU
 
 on:
   pull_request:

@@ -1,4 +1,4 @@
-name: GCC AArch64 Testing
+name: GCC AArch64 Linux GNU
 
 on:
   pull_request:

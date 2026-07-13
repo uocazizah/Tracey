@@ -1,4 +1,4 @@
-name: GCC ARM64 Windows Testing
+name: GCC ARM64 Windows
 
 on:
   pull_request:

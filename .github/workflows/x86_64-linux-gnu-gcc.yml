@@ -1,4 +1,4 @@
-name: GCC X86_64 Testing
+name: GCC X86_64 Linux GNU
 
 on:
   pull_request:

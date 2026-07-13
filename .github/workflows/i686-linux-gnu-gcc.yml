@@ -1,4 +1,4 @@
-name: GCC i686 Testing
+name: GCC i686 Linux GNU
 
 on:
   pull_request:

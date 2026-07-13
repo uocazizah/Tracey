@@ -1,4 +1,4 @@
-name: Clang x86_64 Testing
+name: Clang x86_64 Linux GNU
 
 on:
   pull_request:

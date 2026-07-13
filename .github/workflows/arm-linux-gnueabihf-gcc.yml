@@ -1,4 +1,4 @@
-name: GCC ARMHF Testing
+name: GCC ARMHF Linux GNU
 
 on:
   pull_request:

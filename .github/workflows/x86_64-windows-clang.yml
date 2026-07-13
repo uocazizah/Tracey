@@ -1,4 +1,4 @@
-name: Clang X86_64 Windows Testing
+name: Clang X86_64 Windows
 
 on:
   pull_request:

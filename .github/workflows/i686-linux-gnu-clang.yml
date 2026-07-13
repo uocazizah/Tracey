@@ -1,4 +1,4 @@
-name: Clang i686 Testing
+name: Clang i686 Linux GNU
 
 on:
   pull_request:

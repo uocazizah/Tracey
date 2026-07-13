@@ -1,4 +1,4 @@
-name: Clang X86 Windows Testing
+name: Clang i686 Windows
 
 on:
   pull_request:

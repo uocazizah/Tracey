@@ -1,4 +1,4 @@
-name: Clang ARMHF Testing
+name: Clang ARMHF Linux GNU
 
 on:
   pull_request:

@@ -1,4 +1,4 @@
-name: GCC X86_64 Windows Testing
+name: GCC X86_64 Windows
 
 on:
   pull_request:
