@@ -13,6 +13,7 @@ jobs:
       - name: Setup MSYS2
         uses: msys2/setup-msys2@v2
         with:
+          msystem: CLANG32
           update: true
           install: >-
             autoconf
