@@ -21,12 +21,13 @@ jobs:
             libtool
             make
             pkgconf
-            mingw-w64-i686-clang
+            mingw-w64-x86_64-clang
+            mingw-w64-i686-gcc
 
       - name: Build
         shell: msys2 {0}
         run: |
-          export PATH="/mingw32/bin:$PATH"
+          export PATH="/mingw64/bin:$PATH"
 
           cd bootstrap
 
@@ -36,8 +37,8 @@ jobs:
           cd build
 
           ../configure \
-            CC=clang \
-            CXX=clang++ \
+            CC="clang -m32" \
+            CXX="clang++ -m32" \
             --host=i686-w64-mingw32
 
           make V=1 -j8
