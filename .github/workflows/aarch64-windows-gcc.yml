@@ -34,4 +34,5 @@ jobs:
 
           ../configure CC=gcc CXX=g++
 
-          make V=1 -j8
+          make V=1
+

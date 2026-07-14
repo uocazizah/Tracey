@@ -37,4 +37,4 @@ jobs:
             CC=i686-w64-mingw32-gcc \
             CXX=i686-w64-mingw32-g++
 
-          make V=1 -j8
+          make V=1

@@ -37,4 +37,4 @@ jobs:
             CC=clang \
             CXX=clang++
 
-          make V=1 -j 8
+          make V=1

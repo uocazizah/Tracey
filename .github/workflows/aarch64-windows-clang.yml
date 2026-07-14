@@ -34,4 +34,4 @@ jobs:
 
           ../configure CC=clang CXX=clang++
 
-          make V=1 -j8
+          make V=1

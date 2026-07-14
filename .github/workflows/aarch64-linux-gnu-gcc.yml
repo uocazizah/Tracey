@@ -31,4 +31,4 @@ jobs:
 
           ../configure
 
-          make V=1 -j 8
+          make V=1
