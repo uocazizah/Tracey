@@ -1,0 +1,44 @@
+name: GCC x86_64 Free Berkeley Software Distribution
+
+on:
+  pull_request:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Build and Test on FreeBSD
+        uses: vmactions/freebsd-vm@v1.5.0
+        with:
+          sync: rsync
+          copyback: false
+          cpu: 1
+          arch: x86_64
+          sync-time: true
+          usesh: true
+
+          prepare: |
+            pkg update
+            pkg install -y \
+              gcc \
+              gmake \
+              autoconf \
+              automake \
+              libtool \
+              pkgconf
+
+          run: |
+            export CC=gcc
+            export CXX=g++
+
+            autoreconf -fiv
+
+            mkdir -p build
+            cd build
+
+            ../configure
+
+            gmake
