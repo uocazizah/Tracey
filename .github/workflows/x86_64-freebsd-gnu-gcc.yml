@@ -1,4 +1,4 @@
-name: GCC x86_64 Free Berkeley Software Distribution
+Createname: GCC x86_64 Free Berkeley Software Distribution
 
 on:
   pull_request:
@@ -34,6 +34,7 @@ jobs:
             export CC=gcc
             export CXX=g++
 
+            cd bootstrap
             autoreconf -fiv
 
             mkdir -p build
