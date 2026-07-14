@@ -1,4 +1,4 @@
-Createname: GCC x86_64 Free Berkeley Software Distribution
+name: GCC x86_64 Free Berkeley Software Distribution
 
 on:
   pull_request:
