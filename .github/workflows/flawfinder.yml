@@ -27,7 +27,7 @@ jobs:
       - name: flawfinder_scan
         uses: david-a-wheeler/flawfinder@2.0.19-alpha1
         with:
-          arguments: '--minlevel=0 --context --columns --cwe --sarif --singlethread --timeout=600 --width=10 ./'
+          arguments: '--minlevel=0 --context --columns --sarif --singlethread --timeout=600 ./'
           output: 'flawfinder_results.sarif'
 
       - name: Upload analysis results to GitHub Security tab
