@@ -1,57 +1,38 @@
-#include <cstdarg>
-/* #include <cstdbool> */
-#include <cstdio>
+#include <iostream>
 #include <cstdlib>
 
 #define TRACEYC_NAME   "\033[1mtraceyc\033[0m"
 
 #define COLOR_FATAL    "\033[1;31m"
 #define COLOR_ERROR    "\033[31m"
-#define COLOR_WARNING "\033[35m"
+#define COLOR_WARNING  "\033[35m"
 #define COLOR_RESET    "\033[0m"
 
-static void print_message(
-    const char *color,
-    const char *type,
-    const char *fmt,
-    va_list args)
+// Cetak pesan error: semua argumen dicetak berurutan ke stderr
+template <typename... Args>
+void error(const Args&... args)
 {
-    fprintf(stderr,
-            "%s: %s%s%s: ",
-            TRACEYC_NAME,
-            color,
-            type,
-            COLOR_RESET);
-
-    vfprintf(stderr, fmt, args);
-    fputc('\n', stderr);
+    std::cerr << TRACEYC_NAME << ": "
+              << COLOR_ERROR << "error" << COLOR_RESET << ": ";
+    ((std::cerr << args << ' '), ...);   // fold expression (C++17)
+    std::cerr << '\n';
 }
 
-void error(const char *fmt, ...)
+template <typename... Args>
+void warning(const Args&... args)
 {
-    va_list args;
-
-    va_start(args, fmt);
-    print_message(COLOR_ERROR, "error", fmt, args);
-    va_end(args);
+    std::cerr << TRACEYC_NAME << ": "
+              << COLOR_WARNING << "warning" << COLOR_RESET << ": ";
+    ((std::cerr << args << ' '), ...);
+    std::cerr << '\n';
 }
 
-void warning(const char *fmt, ...)
+template <typename... Args>
+[[noreturn]] void fatal(const Args&... args)
 {
-    va_list args;
-
-    va_start(args, fmt);
-    print_message(COLOR_WARNING, "warning", fmt, args);
-    va_end(args);
-}
-
-[[noreturn]] void fatal(const char *fmt, ...)
-{
-    va_list args;
-
-    va_start(args, fmt);
-    print_message(COLOR_FATAL, "fatal", fmt, args);
-    va_end(args);
-
-    exit(EXIT_FAILURE);
+    std::cerr << TRACEYC_NAME << ": "
+              << COLOR_FATAL << "fatal" << COLOR_RESET << ": ";
+    ((std::cerr << args << ' '), ...);
+    std::cerr << '\n';
+    std::exit(EXIT_FAILURE);
 }
