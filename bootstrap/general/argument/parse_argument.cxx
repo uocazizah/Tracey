@@ -9,15 +9,19 @@ int tracey::argument::argument_option::parse_args(int argc, char **argv)
     warning_all = false;
     warning_extra = false;
 
-    for (int i = 1; i < argc; ++i) {
+    int i = 1;
+    while (i < argc) {
         if (std::strcmp(argv[i], "-Wall") == 0) {
             warning_all = true;
+            ++i;
         } else if (std::strcmp(argv[i], "-Wextra") == 0) {
             warning_extra = true;
-        } else if (std::strcmp(argv[i], "-o") == 0) {
             ++i;
-            if (i < argc) {
-                p_output_file = argv[i];
+        } else if (std::strcmp(argv[i], "-o") == 0) {
+            if (i + 1 < argc) {
+                p_output_file = argv[i + 1];
+                i += 2;
+                continue;
             } else {
                 std::fprintf(stderr, "Error: -o requires an argument\n");
                 return 1;
@@ -25,6 +29,7 @@ int tracey::argument::argument_option::parse_args(int argc, char **argv)
         } else if (argv[i][0] != '-') {
             if (p_input_file == nullptr) {
                 p_input_file = argv[i];
+                ++i;
             } else {
                 std::fprintf(stderr, "Error: multiple input files specified\n");
                 return 1;
