@@ -4,20 +4,19 @@
 
 int compile(tracey::argument::argument_option *option)
 {
-    TraceyFile file = {};
+    tracey::file::TraceyFile file;
 
-    if (tracey_file_open(&file, option->get_input_file()) != 0)
+    if (!file.open(option->get_input_file()))
     {
-        fprintf(stderr,
-                "failed to open '%s'\n",
-                option->get_input_file());
-
+        std::fprintf(stderr,
+                     "failed to open '%s'\n",
+                     option->get_input_file());
         return 1;
     }
 
-   tracey_debug_file_print(&file);
+    file.debug_print();
 
-   tracey_file_close(&file);
+    file.close();
 
     return 0;
 }
