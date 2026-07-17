@@ -1,4 +1,5 @@
 AC_INIT([tracey], [1.0], [uoctamika.codeberg.org@gmail.com])
+AC_CONFIG_MACRO_DIRS([m4])
 
 AC_CONFIG_SRCDIR([index.cxx])
 AC_CONFIG_HEADERS([config.h])
