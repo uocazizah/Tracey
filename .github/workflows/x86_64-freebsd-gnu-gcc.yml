@@ -18,6 +18,8 @@ jobs:
           cpu: 1
           arch: x86_64
           sync-time: true
+          disable-cache: false
+          cache-after-prepare: false
           usesh: true
 
           prepare: |
