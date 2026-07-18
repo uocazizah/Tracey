@@ -1,0 +1,56 @@
+/* cmake/config.h.in - template untuk config.h */
+
+/* Nama dan versi paket */
+#define PACKAGE_NAME "@PROJECT_NAME@"
+#define PACKAGE_VERSION "@PROJECT_VERSION@"
+
+/* Didefinisikan jika header tersedia */
+#cmakedefine HAVE_WINDOWS_H
+#cmakedefine HAVE_ALGORITHM
+#cmakedefine HAVE_BITS_STDCXX_H
+#cmakedefine HAVE_CASSERT
+#cmakedefine HAVE_CCTYPE
+#cmakedefine HAVE_CERRNO
+#cmakedefine HAVE_CFLOAT
+#cmakedefine HAVE_CLIMITS
+#cmakedefine HAVE_CMATH
+#cmakedefine HAVE_CSETJMP
+#cmakedefine HAVE_CSIGNAL
+#cmakedefine HAVE_CSTDARG
+#cmakedefine HAVE_CSTDDEF
+#cmakedefine HAVE_CSTDINT
+#cmakedefine HAVE_CSTDIO
+#cmakedefine HAVE_CSTDLIB
+#cmakedefine HAVE_CSTRING
+#cmakedefine HAVE_CTIME
+#cmakedefine HAVE_CWCHAR
+#cmakedefine HAVE_CWCTYPE
+#cmakedefine HAVE_DEQUE
+#cmakedefine HAVE_EXCEPTION
+#cmakedefine HAVE_FSTREAM
+#cmakedefine HAVE_FUNCTIONAL
+#cmakedefine HAVE_IOMANIP
+#cmakedefine HAVE_IOS
+#cmakedefine HAVE_IOSFWD
+#cmakedefine HAVE_IOSTREAM
+#cmakedefine HAVE_ISTREAM
+#cmakedefine HAVE_ITERATOR
+#cmakedefine HAVE_LIMITS
+#cmakedefine HAVE_LIST
+#cmakedefine HAVE_LOCALE
+#cmakedefine HAVE_MAP
+#cmakedefine HAVE_MEMORY
+#cmakedefine HAVE_NEW
+#cmakedefine HAVE_NUMERIC
+#cmakedefine HAVE_OSTREAM
+#cmakedefine HAVE_QUEUE
+#cmakedefine HAVE_SET
+#cmakedefine HAVE_SSTREAM
+#cmakedefine HAVE_STACK
+#cmakedefine HAVE_STDEXCEPT
+#cmakedefine HAVE_STREAMBUF
+#cmakedefine HAVE_STRING
+#cmakedefine HAVE_TYPEINFO
+#cmakedefine HAVE_UTILITY
+#cmakedefine HAVE_VALARRAY
+#cmakedefine HAVE_VECTOR
