@@ -15,6 +15,10 @@ traceyc_SOURCES = \
     general/argument/get_warning_extra.cxx \
     general/compile/compiler_pipeline.cxx \
     general/error/normal_error.cxx \
-    general/file/debug_print_file.cxx \
-    general/file/file_close.cxx \
-    general/file/file_open.cxx
+    general/file/close.cxx \
+    general/file/constructor.cxx \
+    general/file/debug.cxx \
+    general/file/destructor.cxx \
+    general/file/move_assignment.cxx \
+    general/file/move_constructor.cxx \
+    general/file/open.cxx

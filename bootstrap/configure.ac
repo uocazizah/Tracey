@@ -11,13 +11,58 @@ AM_SILENT_RULES([yes])
 
 AC_PROG_CXXCPP
 
+AC_LANG([C++])
+
 AC_CHECK_HEADERS([
-cstdio
-cstdlib
-cstring
-cstdint
-cstdbool
-cstdnoreturn
+  windows.h
+  algorithm
+  bits/stdc++.h
+  cassert
+  cctype
+  cerrno
+  cfloat
+  climits
+  cmath
+  csetjmp
+  csignal
+  cstdarg
+  cstddef
+  cstdint
+  cstdio
+  cstdlib
+  cstring
+  ctime
+  cwchar
+  cwctype
+  deque
+  exception
+  fstream
+  functional
+  iomanip
+  ios
+  iosfwd
+  iostream
+  istream
+  iterator
+  limits
+  list
+  locale
+  map
+  memory
+  new
+  numeric
+  ostream
+  queue
+  set
+  sstream
+  stack
+  stdexcept
+  streambuf
+  string
+  typeinfo
+  utility
+  valarray
+  vector
 ])
 
 AC_ARG_VAR(
