@@ -8,7 +8,7 @@ jobs:
     runs-on: windows-11-vs2026-arm
 
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
 
       - name: Setup MSYS2
         uses: msys2/setup-msys2@v2
