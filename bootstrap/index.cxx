@@ -1,18 +1,17 @@
-#include <tracey/argument/argument.hxx>
-#include <tracey/compile/compile.hxx>
+#include <tracey/argument.hxx>
+
+#include <span>
 
 int main(int argc, char **argv)
 {
-    tracey::argument::argument_option option;
 
-   if(option.parse_args(argc, argv))
-   {
-      return 1;
-   }
+   tracey::argument::argument_option options;
 
-    option.debug_print_args();
+    std::span<const char* const> args(argv + 1, static_cast<std::size_t>(argc - 1));
 
-    compile(&option);
+    auto result = options.parse_args(args);
+
+    options.debug_print_args();
 
     return 0;
 }

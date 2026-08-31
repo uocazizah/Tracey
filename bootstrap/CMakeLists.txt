@@ -10,7 +10,7 @@ project(tracey
 # Basic project setup
 # -----------------------------------------------------------------------------
 
-set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
@@ -53,6 +53,7 @@ add_library(tracey_warnings INTERFACE)
 
 if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
     target_compile_options(tracey_warnings INTERFACE
+        # ---- Core set (already there) ----
         -Wall
         -Wextra
         -Wpedantic
@@ -71,24 +72,78 @@ if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
         -Wmisleading-indentation
         -Wduplicated-cond
         -Wuseless-cast
+
+        # ---- Newly added (safe & generally useful) ----
+        -Wcast-qual
+        -Wzero-as-null-pointer-constant
+        -Wundef
+        -Wreorder
+        -Wsign-promo
+        -Wfloat-equal
+        -Wmissing-declarations
+        -Wmissing-include-dirs
+
+        # ---- Additional “bread‑and‑butter” warnings ----
+        -Wuninitialized               # catches uninitialised variables (already in -Wall, but explicit)
+        -Wmaybe-uninitialized         # GCC‑only? Actually also in Clang with -Wuninitialized, but we keep for completeness
+        -Wstrict-aliasing=3           # strict aliasing rules (level 3 is moderate)
+        -Wstrict-overflow=5           # warn about signed overflow (level 5 is more conservative)
+        -Wswitch-default              # warn when switch lacks a default case
+        -Wswitch-enum                 # warn if enum switch misses a case (can be noisy, but good for exhaustive handling)
+        -Wmissing-field-initializers  # warn if struct/class init misses a field (C++ supports it)
+        -Wredundant-decls             # warn about redundant declarations in the same scope
+        -Wctor-dtor-privacy           # warn when class has private constructor/destructor and no friends
+        -Wdeprecated                  # warn about deprecated features (e.g., use of deprecated declarations)
+        -Wnoexcept                    # warn about missing noexcept in move/swap
+        -Wnoexcept-type               # warn about incompatible noexcept specifications
+
+        # ---- C++11/14/17 modernisation hints (low noise, high payoff) ----
+        -Wsuggest-override            # suggest adding `override` where appropriate
+        -Wsuggest-final-types         # suggest final for classes never derived from (GCC only? Clang also has -Wfinal-...)
+        -Wsuggest-final-methods       # suggest final for methods that shouldn't be overridden
+
+        # ---- Clang‑specific extras (GCC ignores these gracefully) ----
+        $<$<CXX_COMPILER_ID:Clang>:
+            -Wextra-semi               # warn about extra semicolons (C++11)
+            -Winconsistent-missing-destructor-override
+            -Winconsistent-missing-override
+            -Wtautological-compare     # compare always true/false
+            -Wshadow-all               # even stricter shadowing
+            -Wmissing-variable-declarations  # global vars without extern
+            -Wconditional-uninitialized
+        >
     )
 
-    # -Wduplicated-branches and -Wlogical-op are GCC-only; Clang does not
-    # recognize them.
+    # ---- GCC‑only extras (Clang doesn't recognise all of them) ----
     if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
         target_compile_options(tracey_warnings INTERFACE
             -Wduplicated-branches
             -Wlogical-op
-            -Wuseless-cast
+            -Wcast-function-type      # warn about casting function pointers to incompatible types
+            -Wtrampolines             # warn about trampolines (e.g., nested functions)
+            -Wvector-operation-performance
+            # -Weffc++                # VERY noisy; I recommend NOT enabling it by default
         )
     endif()
 
+    # ---- Optional: treat warnings as errors (still OFF by default) ----
     option(TRACEY_WARNINGS_AS_ERRORS "Treat warnings as errors" OFF)
     if(TRACEY_WARNINGS_AS_ERRORS)
         target_compile_options(tracey_warnings INTERFACE -Werror)
     endif()
+
 elseif(CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
-    target_compile_options(tracey_warnings INTERFACE /W4)
+    # MSVC: /W4 is a good baseline; add a few more specific warnings
+    target_compile_options(tracey_warnings INTERFACE
+        /W4
+        # Additional warnings (with /w<number> syntax)
+        /w14265  # class with virtual functions but non‑virtual destructor
+        /w14296  # non‑virtual operator= in class with virtual functions
+        /w14640  # enable /W4 warning about using a negative number in unsigned context
+        /w14826  # conversion from 'type1' to 'type2' is sign‑extended
+        /w14928  # inconsistent annotation for 'new': __declspec(allocator) mismatch
+    )
+    # /WX remains optional via the same option
     option(TRACEY_WARNINGS_AS_ERRORS "Treat warnings as errors" OFF)
     if(TRACEY_WARNINGS_AS_ERRORS)
         target_compile_options(tracey_warnings INTERFACE /WX)
