@@ -15,20 +15,14 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y \
             build-essential \
-            automake \
-            autoconf \
-            libtool \
+            cmake \
             pkg-config
 
       - name: Build
         run: |
           cd bootstrap
+          mkdir -p build && cd build
 
-          autoreconf -fiv
+          cmake .. -DARCH=native
 
-          mkdir -p build
-          cd build
-
-          ../configure
-
-          make V=1
+          cmake --build . --verbose

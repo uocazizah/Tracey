@@ -15,9 +15,7 @@ jobs:
         with:
           update: true
           install: >-
-            autoconf
-            automake
-            libtool
+            cmake
             make
             pkgconf
             gcc
@@ -27,12 +25,13 @@ jobs:
         run: |
           cd bootstrap
 
-          autoreconf -fiv
-
           mkdir -p build
           cd build
 
-          ../configure CC=gcc CXX=g++
+          cmake .. \
+            -G "MSYS Makefiles" \
+            -DARCH=native \
+            -DCMAKE_C_COMPILER=gcc \
+            -DCMAKE_CXX_COMPILER=g++
 
-          make V=1
-
+          cmake --build . --verbose

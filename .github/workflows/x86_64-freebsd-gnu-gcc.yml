@@ -27,21 +27,18 @@ jobs:
             pkg install -y \
               gcc \
               gmake \
-              autoconf \
-              automake \
-              libtool \
+              cmake \
               pkgconf
 
           run: |
-            export CC=gcc
-            export CXX=g++
-
             cd bootstrap
-            autoreconf -fiv
-
             mkdir -p build
             cd build
 
-            ../configure
+            cmake .. \
+              -DARCH=native \
+              -DCMAKE_C_COMPILER=gcc \
+              -DCMAKE_CXX_COMPILER=g++ \
+              -DCMAKE_MAKE_PROGRAM=gmake
 
-            gmake V=1
+            cmake --build . --verbose

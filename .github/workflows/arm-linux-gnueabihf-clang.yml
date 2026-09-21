@@ -16,9 +16,7 @@ jobs:
           sudo apt-get install -y \
             clang \
             llvm \
-            automake \
-            autoconf \
-            libtool \
+            cmake \
             pkg-config \
             gcc-arm-linux-gnueabihf \
             g++-arm-linux-gnueabihf
@@ -26,16 +24,15 @@ jobs:
       - name: Build
         run: |
           cd bootstrap
+          mkdir -p build && cd build
 
-          autoreconf -fiv
+          cmake .. \
+            -DARCH=native \
+            -DCMAKE_SYSTEM_NAME=Linux \
+            -DCMAKE_SYSTEM_PROCESSOR=arm \
+            -DCMAKE_C_COMPILER=clang \
+            -DCMAKE_CXX_COMPILER=clang++ \
+            -DCMAKE_C_FLAGS="--target=arm-linux-gnueabihf" \
+            -DCMAKE_CXX_FLAGS="--target=arm-linux-gnueabihf"
 
-          mkdir -p build
-          cd build
-
-          export CC="clang --target=arm-linux-gnueabihf"
-          export CXX="clang++ --target=arm-linux-gnueabihf"
-
-          ../configure \
-            --host=arm-linux-gnueabihf
-
-          make V=1
+          cmake --build . --verbose

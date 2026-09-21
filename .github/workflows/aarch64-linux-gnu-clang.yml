@@ -16,23 +16,16 @@ jobs:
           sudo apt-get install -y \
             clang \
             llvm \
-            automake \
-            autoconf \
-            libtool \
+            cmake \
             pkg-config
 
       - name: Build
         run: |
           cd bootstrap
+          mkdir -p build && cd build
 
-          autoreconf -fiv
+          cmake .. -DARCH=native \
+            -DCMAKE_C_COMPILER=clang \
+            -DCMAKE_CXX_COMPILER=clang++
 
-          mkdir -p build
-          cd build
-
-          CC=clang \
-          CXX=clang++ \
-          ../configure
-
-          make V=1
-
+          cmake --build . --verbose

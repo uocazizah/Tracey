@@ -14,9 +14,7 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y \
-            automake \
-            autoconf \
-            libtool \
+            cmake \
             pkg-config \
             gcc-i686-linux-gnu \
             g++-i686-linux-gnu
@@ -24,16 +22,13 @@ jobs:
       - name: Build
         run: |
           cd bootstrap
+          mkdir -p build && cd build
 
-          autoreconf -fiv
+          cmake .. \
+            -DARCH=native \
+            -DCMAKE_SYSTEM_NAME=Linux \
+            -DCMAKE_SYSTEM_PROCESSOR=i686 \
+            -DCMAKE_C_COMPILER=i686-linux-gnu-gcc \
+            -DCMAKE_CXX_COMPILER=i686-linux-gnu-g++
 
-          mkdir -p build
-          cd build
-
-          export CC=i686-linux-gnu-gcc
-          export CXX=i686-linux-gnu-g++
-
-          ../configure \
-            --host=i686-linux-gnu
-
-          make V=1
+          cmake --build . --verbose

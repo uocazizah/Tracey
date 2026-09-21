@@ -13,7 +13,7 @@ jobs:
       - name: Install tools
         run: |
           brew update
-          brew install gcc autoconf automake libtool pkg-config
+          brew install gcc cmake pkg-config
 
       - name: Show environment
         run: |
@@ -24,12 +24,12 @@ jobs:
       - name: Build and test
         run: |
           cd bootstrap
-          autoreconf -fiv
           mkdir -p build
           cd build
 
-          CC=gcc-15 \
-          CXX=g++-15 \
-          ../configure
+          cmake .. \
+            -DARCH=native \
+            -DCMAKE_C_COMPILER=gcc-15 \
+            -DCMAKE_CXX_COMPILER=g++-15
 
-          make V=1
+          cmake --build . --verbose
