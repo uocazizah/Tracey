@@ -18,24 +18,21 @@ jobs:
             llvm \
             gcc-i686-linux-gnu \
             g++-i686-linux-gnu \
-            automake \
-            autoconf \
-            libtool \
+            cmake \
             pkg-config
 
       - name: Build
         run: |
           cd bootstrap
+          mkdir -p build && cd build
 
-          autoreconf -fiv
+          cmake .. \
+            -DARCH=native \
+            -DCMAKE_SYSTEM_NAME=Linux \
+            -DCMAKE_SYSTEM_PROCESSOR=i686 \
+            -DCMAKE_C_COMPILER=clang \
+            -DCMAKE_CXX_COMPILER=clang++ \
+            -DCMAKE_C_FLAGS="--target=i686-linux-gnu" \
+            -DCMAKE_CXX_FLAGS="--target=i686-linux-gnu"
 
-          mkdir -p build
-          cd build
-
-          export CC="clang --target=i686-linux-gnu"
-          export CXX="clang++ --target=i686-linux-gnu"
-
-          ../configure \
-            --host=i686-linux-gnu
-
-          make V=1
+          cmake --build . --verbose

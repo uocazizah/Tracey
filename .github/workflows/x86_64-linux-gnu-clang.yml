@@ -6,18 +6,26 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+
     steps:
       - uses: actions/checkout@v7
 
       - name: Install dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y clang llvm automake autoconf libtool pkg-config
+          sudo apt-get install -y \
+            clang \
+            llvm \
+            cmake \
+            pkg-config
 
-      - name: Build and test
+      - name: Build
         run: |
           cd bootstrap
-          autoreconf -fiv
           mkdir -p build && cd build
-          CC=clang CXX=clang++ ../configure
-          make V=1
+
+          cmake .. -DARCH=native \
+            -DCMAKE_C_COMPILER=clang \
+            -DCMAKE_CXX_COMPILER=clang++
+
+          cmake --build . --verbose

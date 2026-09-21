@@ -16,9 +16,7 @@ jobs:
           msystem: MINGW32
           update: true
           install: >-
-            autoconf
-            automake
-            libtool
+            mingw-w64-i686-cmake
             make
             pkgconf
             mingw-w64-i686-gcc
@@ -28,13 +26,13 @@ jobs:
         run: |
           cd bootstrap
 
-          autoreconf -fiv
-
           mkdir -p build
           cd build
 
-          ../configure \
-            CC=i686-w64-mingw32-gcc \
-            CXX=i686-w64-mingw32-g++
+          cmake .. \
+            -G "MSYS Makefiles" \
+            -DARCH=native \
+            -DCMAKE_C_COMPILER=i686-w64-mingw32-gcc \
+            -DCMAKE_CXX_COMPILER=i686-w64-mingw32-g++
 
-          make V=1
+          cmake --build . --verbose
