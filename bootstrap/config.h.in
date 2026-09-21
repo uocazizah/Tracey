@@ -1,0 +1,22 @@
+#ifndef TRACEY_CONFIG_H
+#define TRACEY_CONFIG_H
+
+/* Optional features */
+#cmakedefine TRACEY_HAVE_ZLIB 1
+#cmakedefine TRACEY_HAVE_THREADS 1
+
+/* Headers */
+#cmakedefine HAVE_STDIO_H 1
+#cmakedefine HAVE_STDLIB_H 1
+#cmakedefine HAVE_STRING_H 1
+#cmakedefine HAVE_STDDEF_H 1
+#cmakedefine HAVE_STDINT_H 1
+#cmakedefine HAVE_INTTYPES_H 1
+#cmakedefine HAVE_LIMITS_H 1
+#cmakedefine HAVE_MATH_H 1
+#cmakedefine HAVE_UNISTD_H 1
+#cmakedefine HAVE_SYS_TYPES_H 1
+#cmakedefine HAVE_FCNTL_H 1
+
+#endif /* TRACEY_CONFIG_H */
+
