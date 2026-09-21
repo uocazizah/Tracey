@@ -1,7 +1,6 @@
 # ---> C
 
 # bootstrap
-bootstrap/config.h.in
 bootstrap/build/
 
 # Prerequisites
