@@ -15,6 +15,11 @@ jobs:
           brew update
           brew install cmake pkg-config
 
+      - name: Install Python dependencies
+        run: |
+          python3 -m pip install --upgrade pip
+          python3 -m pip install kconfiglib kbuild
+
       - name: Show environment
         run: |
           uname -a
