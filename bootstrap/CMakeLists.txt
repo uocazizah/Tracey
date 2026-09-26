@@ -17,6 +17,81 @@ endif()
 set(CMAKE_C_FLAGS_DEBUG "-g -O0")  
   
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)  
+
+# >>> KCONFIG >>> ----------------------------------------------------------
+# Integrasi Kconfiglib: target `menuconfig` + generate `kconfig_autoconf.h`
+# --------------------------------------------------------------------------
+find_package(Python3 COMPONENTS Interpreter REQUIRED)
+
+execute_process(
+    COMMAND ${Python3_EXECUTABLE} -c "import kconfiglib"
+    RESULT_VARIABLE TRACEY_KCONFIGLIB_MISSING
+    OUTPUT_QUIET ERROR_QUIET
+)
+if(TRACEY_KCONFIGLIB_MISSING)
+    message(FATAL_ERROR
+        "Kconfiglib tidak ditemukan untuk Python3 (${Python3_EXECUTABLE}).\n"
+        "Install: ${Python3_EXECUTABLE} -m pip install kconfiglib")
+endif()
+
+set(TRACEY_KCONFIG_FILE   "${CMAKE_CURRENT_SOURCE_DIR}/Kconfig")
+set(TRACEY_DOT_CONFIG     "${CMAKE_CURRENT_SOURCE_DIR}/.config")
+set(TRACEY_KCONFIG_SCRIPT "${CMAKE_CURRENT_SOURCE_DIR}/scripts/kconfig_tool.py")
+set(TRACEY_KCONFIG_HEADER "${CMAKE_CURRENT_BINARY_DIR}/kconfig_autoconf.h")
+
+# Buat .config default jika belum ada
+if(NOT EXISTS ${TRACEY_DOT_CONFIG})
+    message(STATUS "Kconfig: .config belum ada, generate default")
+    execute_process(
+        COMMAND ${Python3_EXECUTABLE} ${TRACEY_KCONFIG_SCRIPT} olddefconfig
+                --kconfig ${TRACEY_KCONFIG_FILE}
+                --config  ${TRACEY_DOT_CONFIG}
+        WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+        RESULT_VARIABLE TRACEY_KCONFIG_INIT_RESULT
+    )
+    if(NOT TRACEY_KCONFIG_INIT_RESULT EQUAL 0)
+        message(FATAL_ERROR "Gagal menginisialisasi .config")
+    endif()
+endif()
+
+# Target: `cmake --build <dir> --target menuconfig`
+add_custom_target(menuconfig
+    COMMAND ${Python3_EXECUTABLE} ${TRACEY_KCONFIG_SCRIPT} menuconfig
+            --kconfig ${TRACEY_KCONFIG_FILE}
+            --config  ${TRACEY_DOT_CONFIG}
+    WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+    COMMENT "Menjalankan menuconfig..."
+    USES_TERMINAL
+    VERBATIM
+)
+
+# Target: normalisasi .config ke default (opsional)
+add_custom_target(olddefconfig
+    COMMAND ${Python3_EXECUTABLE} ${TRACEY_KCONFIG_SCRIPT} olddefconfig
+            --kconfig ${TRACEY_KCONFIG_FILE}
+            --config  ${TRACEY_DOT_CONFIG}
+    WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+    COMMENT "Normalisasi .config..."
+    USES_TERMINAL
+    VERBATIM
+)
+
+# Generate `kconfig_autoconf.h` dari `.config`
+add_custom_command(
+    OUTPUT  ${TRACEY_KCONFIG_HEADER}
+    COMMAND ${Python3_EXECUTABLE} ${TRACEY_KCONFIG_SCRIPT} gen-header
+            --kconfig ${TRACEY_KCONFIG_FILE}
+            --config  ${TRACEY_DOT_CONFIG}
+            --header  ${TRACEY_KCONFIG_HEADER}
+    DEPENDS ${TRACEY_KCONFIG_FILE}
+            ${TRACEY_KCONFIG_SCRIPT}
+            ${TRACEY_DOT_CONFIG}
+    COMMENT "Generate kconfig_autoconf.h dari .config"
+    VERBATIM
+)
+
+add_custom_target(tracey_kconfig_header DEPENDS ${TRACEY_KCONFIG_HEADER})
+# <<< KCONFIG <<< ----------------------------------------------------------
   
 set(ARCH "native" CACHE STRING "Target architecture: native, i686, or x86_64")  
 set_property(CACHE ARCH PROPERTY STRINGS native i686 x86_64)  
@@ -232,8 +307,11 @@ file(GLOB_RECURSE TRACEY_SOURCES CONFIGURE_DEPENDS
     "${CMAKE_CURRENT_SOURCE_DIR}/general/*.c"  
 )  
   
-add_executable(traceyc ${TRACEY_SOURCES})  
-  
+add_executable(traceyc ${TRACEY_SOURCES})
+
+# >>> KCONFIG >>> tambahkan dependency
+add_dependencies(traceyc tracey_kconfig_header)
+# <<< KCONFIG <<<
 target_include_directories(traceyc PRIVATE  
     "${CMAKE_CURRENT_SOURCE_DIR}/include"  
 )  
