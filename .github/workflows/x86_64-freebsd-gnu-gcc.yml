@@ -28,12 +28,17 @@ jobs:
               gcc \
               gmake \
               cmake \
-              pkgconf
+              pkgconf \
+              python3 \
+              py311-pip
 
           run: |
             cd bootstrap
             mkdir -p build
             cd build
+
+            python3 -m pip install --upgrade pip
+            python3 -m pip install kconfiglib kbuild
 
             cmake .. \
               -DARCH=native \
