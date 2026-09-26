@@ -19,7 +19,13 @@ jobs:
             gcc-i686-linux-gnu \
             g++-i686-linux-gnu \
             cmake \
-            pkg-config
+            pkg-config \
+            python3-pip
+
+      - name: Install Python dependencies
+        run: |
+          python3 -m pip install --upgrade pip
+          python3 -m pip install kconfiglib kbuild
 
       - name: Build
         run: |
