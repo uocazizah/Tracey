@@ -1,0 +1,49 @@
+mainmenu "Tracey Compiler Configuration"
+
+menu "Build options"
+
+config TRACEY_DEBUG_TRACE
+    bool "Enable runtime debug tracing"
+    default n
+    help
+      Cetak informasi tracing verbose saat runtime.
+
+config TRACEY_MAX_SOURCE_SIZE
+    int "Maximum source file size (bytes)"
+    range 4096 1048576
+    default 65536
+    help
+      Batas ukuran sumber yang diterima dalam byte.
+
+config TRACEY_STACK_SIZE
+    int "Internal stack size"
+    range 256 65536
+    default 4096
+
+choice TRACEY_DEFAULT_TARGET
+    prompt "Default target architecture"
+    default TRACEY_DEFAULT_TARGET_NATIVE
+
+config TRACEY_DEFAULT_TARGET_NATIVE
+    bool "native"
+
+config TRACEY_DEFAULT_TARGET_I686
+    bool "i686 (32-bit)"
+
+config TRACEY_DEFAULT_TARGET_X86_64
+    bool "x86_64 (64-bit)"
+endchoice
+
+endmenu
+
+menu "Optional features"
+
+config TRACEY_USE_ZLIB
+    bool "Enable zlib support"
+    default n
+
+config TRACEY_USE_THREADS
+    bool "Enable multi-threading"
+    default y
+
+endmenu
