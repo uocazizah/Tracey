@@ -1,6 +1,8 @@
 #ifndef TRACEY_CONFIG_H
 #define TRACEY_CONFIG_H
 
+#include "kconfig_autoconf.h"
+
 /* Optional features */
 #cmakedefine TRACEY_HAVE_ZLIB 1
 #cmakedefine TRACEY_HAVE_THREADS 1
