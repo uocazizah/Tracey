@@ -17,7 +17,13 @@ jobs:
             cmake \
             pkg-config \
             gcc-arm-linux-gnueabihf \
-            g++-arm-linux-gnueabihf
+            g++-arm-linux-gnueabihf \
+            python3-pip
+
+      - name: Install Python dependencies
+        run: |
+          python3 -m pip install --upgrade pip
+          python3 -m pip install kconfiglib kbuild
 
       - name: Build
         run: |
