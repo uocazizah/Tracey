@@ -12,12 +12,14 @@ static tracey_args_result_t parse_option_with_arg(int* i, int argc, char** argv,
 
 tracey_args_result_t tracey_args_parse(tracey_args_t** out_args, int argc, char** argv, const tracey_args_config_t* config)
 {
+    tracey_args_config_t default_config;
+    tracey_args_t* args;
+
     if (!out_args || argc < 0 || !argv) {
         return TRACEY_ARGS_ERROR_INVALID;
     }
 
     /* Default configuration */
-    tracey_args_config_t default_config;
     default_config.program_name = "tracey";
     default_config.version_string = "1.0.0";
     default_config.description = "Tracey compiler";
@@ -30,7 +32,7 @@ tracey_args_result_t tracey_args_parse(tracey_args_t** out_args, int argc, char*
     }
 
     /* Allocate main structure */
-    tracey_args_t* args = calloc(1, sizeof(tracey_args_t));
+    args = calloc(1, sizeof(tracey_args_t));
     if (!args) return TRACEY_ARGS_ERROR_NOMEM;
 
     args->program_name = default_config.program_name;
@@ -42,9 +44,9 @@ tracey_args_result_t tracey_args_parse(tracey_args_t** out_args, int argc, char*
     args->include_capacity = INITIAL_CAPACITY;
     args->define_capacity = INITIAL_CAPACITY;
 
-    args->input_files = calloc(args->input_capacity, sizeof(char*));
-    args->include_paths = calloc(args->include_capacity, sizeof(char*));
-    args->defines = calloc(args->define_capacity, sizeof(char*));
+    args->input_files = calloc(args->input_capacity, sizeof(void*));
+    args->include_paths = calloc(args->include_capacity, sizeof(void*));
+    args->defines = calloc(args->define_capacity, sizeof(void*));
 
     if (!args->input_files || !args->include_paths || !args->defines) {
         tracey_args_free(args);
@@ -80,7 +82,7 @@ tracey_args_result_t tracey_args_parse(tracey_args_t** out_args, int argc, char*
                 tracey_args_free(args);
                 return res;
             }
-            args->output_file = (char*)out_file;
+            args->output_file = out_file;
         }
         else if (strcmp(arg, "-I") == 0 || strcmp(arg, "--include") == 0) {
             const char* path = NULL;
@@ -189,8 +191,9 @@ static tracey_args_result_t parse_optimization(const char* arg, int* i, int argc
 /* Parse option that requires an argument (e.g., -o file, -I path) */
 static tracey_args_result_t parse_option_with_arg(int* i, int argc, char** argv, const char** out)
 {
+    const char* val;
     if (*i + 1 >= argc) return TRACEY_ARGS_ERROR_MISSING_ARG;
-    const char* val = argv[++(*i)];
+    val = argv[++(*i)];
     if (val[0] == '\0') return TRACEY_ARGS_ERROR_EMPTY_ARG;
     *out = val;
     return TRACEY_ARGS_OK;
