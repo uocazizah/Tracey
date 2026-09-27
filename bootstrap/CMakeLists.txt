@@ -110,125 +110,124 @@ else()
     message(FATAL_ERROR "unsupported architecture '${ARCH}'")  
 endif()  
   
-add_library(tracey_warnings INTERFACE)  
-  
-if(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")  
-    target_compile_options(tracey_warnings INTERFACE  
-        -Wall  
-        -Wextra  
-        -Wpedantic  
-        -Wshadow  
-        -Wcast-align  
-        -Wunused  
-        -Wconversion  
-        -Wsign-conversion  
-        -Wnull-dereference  
-        -Wdouble-promotion  
-        -Wformat=2  
-        -Wimplicit-fallthrough  
-        -Wmisleading-indentation  
-        -Wduplicated-cond  
-        -Wcast-qual  
-        -Wundef  
-        -Wfloat-equal  
-        -Wmissing-declarations  
-        -Wmissing-include-dirs  
-        -Wuninitialized  
-        -Wmaybe-uninitialized  
-        -Wstrict-aliasing=3  
-        -Wstrict-overflow=5  
-        -Wswitch-default  
-        -Wswitch-enum  
-        -Wmissing-field-initializers  
-        -Wredundant-decls  
-        -Wdeprecated  
-        -Wsign-compare  
-        -Wmissing-prototypes  
-        -Wstrict-prototypes  
-        -Wold-style-definition  
-        -Wmissing-parameter-type  
-        -Wpointer-arith  
-        -Wwrite-strings  
-        -Waggregate-return  
-        -Wbad-function-cast  
-        -Wnested-externs  
-        -Wjump-misses-init  
-        -Wdeclaration-after-statement  
-        -Wvla  
-        -Wvariadic-macros  
-        $<$<C_COMPILER_ID:Clang>:  
-            -Wextra-semi  
-            -Wtautological-compare  
-            -Wshadow-all  
-            -Wmissing-variable-declarations  
-            -Wconditional-uninitialized  
-            -Wc99-c11-compat  
-            -Wdocumentation  
-            -Wcovered-switch-default  
-            -Wdeprecated-implementations  
-            -Wmissing-noreturn  
-            -Wused-but-marked-unused  
-            -Wunused-macros  
-            -Wunused-parameter  
-            -Wunused-result  
-            -Wunused-value  
-            -Wnewline-eof  
-            -Wc17-compat  
-            -Wcomma  
-            -Wempty-translation-unit  
-            -Wfloat-overflow-conversion  
-            -Wfloat-zero-conversion  
-            -Werror=implicit-function-declaration  
-            -Werror=incompatible-pointer-types  
-        >  
-    )  
-  
-    if(CMAKE_C_COMPILER_ID STREQUAL "GNU")  
-        target_compile_options(tracey_warnings INTERFACE  
-            -Wduplicated-branches  
-            -Wlogical-op  
-            -Wcast-function-type  
-            -Wtrampolines  
-            -Wvector-operation-performance  
-            -Wclobbered  
-            -Wempty-body  
-            -Wignored-qualifiers  
-            -Wmaybe-uninitialized  
-            -Walloc-zero  
-            -Walloca  
-            -Warray-bounds=2  
-            -Wattribute-alias=2  
-            -Wbidi-chars=any  
-            -Wbuiltin-declaration-mismatch  
-            -Wformat-signedness  
-            -Wformat-truncation  
-            -Wformat-overflow  
-            -Wrestrict  
-            -Wstringop-overflow  
-            -Wstringop-truncation  
-            -Wshift-overflow  
-            -Wpacked  
-            -Wpadded  
-            -Wpointer-sign  
-            -Wreturn-local-addr  
-            -Wsequence-point  
-            -Wsizeof-array-argument  
-            -Wsizeof-pointer-memaccess  
-            -Wtrigraphs  
-            -Wunused-macros  
-            -Wvolatile-register-var  
-            -Wzero-length-bounds  
-            -Wdisabled-optimization  
-            -Werror=implicit-function-declaration  
-            -Werror=incompatible-pointer-types  
-            -Werror=int-conversion  
-        )  
-    endif()  
-  
-    option(TRACEY_WARNINGS_AS_ERRORS "Treat warnings as errors" OFF)  
-    if(TRACEY_WARNINGS_AS_ERRORS)  
-        target_compile_options(tracey_warnings INTERFACE -Werror)  
-    endif()  
+add_library(tracey_warnings INTERFACE)
+
+if(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
+    # Common flags for both GCC and Clang
+    target_compile_options(tracey_warnings INTERFACE
+        -Wall
+        -Wextra
+        -Wpedantic
+        -Wshadow
+        -Wcast-align
+        -Wunused
+        -Wconversion
+        -Wsign-conversion
+        -Wnull-dereference
+        -Wdouble-promotion
+        -Wformat=2
+        -Wimplicit-fallthrough
+        -Wmisleading-indentation
+        -Wcast-qual
+        -Wundef
+        -Wfloat-equal
+        -Wmissing-declarations
+        -Wmissing-include-dirs
+        -Wuninitialized
+        -Wswitch-default
+        -Wswitch-enum
+        -Wmissing-field-initializers
+        -Wredundant-decls
+        -Wdeprecated
+        -Wsign-compare
+        -Wbad-function-cast
+        -Wnested-externs
+        -Wjump-misses-init
+        -Wvariadic-macros
+    )
+
+    # GCC-specific flags
+    if(CMAKE_C_COMPILER_ID STREQUAL "GNU")
+        target_compile_options(tracey_warnings INTERFACE
+            -Wduplicated-cond
+            -Wmaybe-uninitialized
+            -Wstrict-aliasing=3
+            -Wstrict-overflow=5
+            -Wmissing-prototypes
+            -Wstrict-prototypes
+            -Wold-style-definition
+            -Wdeclaration-after-statement
+            -Wvla
+            -Wduplicated-branches
+            -Wlogical-op
+            -Wcast-function-type
+            -Wtrampolines
+            -Wvector-operation-performance
+            -Wclobbered
+            -Wempty-body
+            -Wignored-qualifiers
+            -Walloc-zero
+            -Walloca
+            -Warray-bounds=2
+            -Wattribute-alias=2
+            -Wbidi-chars=any
+            -Wbuiltin-declaration-mismatch
+            -Wformat-signedness
+            -Wformat-truncation
+            -Wformat-overflow
+            -Wrestrict
+            -Wstringop-overflow
+            -Wstringop-truncation
+            -Wshift-overflow
+            -Wpacked
+            -Wpadded
+            -Wpointer-sign
+            -Wreturn-local-addr
+            -Wsequence-point
+            -Wsizeof-array-argument
+            -Wsizeof-pointer-memaccess
+            -Wtrigraphs
+            -Wunused-macros
+            -Wvolatile-register-var
+            -Wzero-length-bounds
+            -Wdisabled-optimization
+            -Werror=implicit-function-declaration
+            -Werror=incompatible-pointer-types
+            -Werror=int-conversion
+        )
+    endif()
+
+    # Clang-specific flags
+    if(CMAKE_C_COMPILER_ID STREQUAL "Clang")
+        target_compile_options(tracey_warnings INTERFACE
+            -Wextra-semi
+            -Wtautological-compare
+            -Wshadow-all
+            -Wmissing-variable-declarations
+            -Wconditional-uninitialized
+            -Wdocumentation
+            -Wcovered-switch-default
+            -Wdeprecated-implementations
+            -Wmissing-noreturn
+            -Wused-but-marked-unused
+            -Wunused-macros
+            -Wunused-parameter
+            -Wunused-result
+            -Wunused-value
+            -Wnewline-eof
+            -Wcomma
+            -Wempty-translation-unit
+            -Wfloat-overflow-conversion
+            -Wfloat-zero-conversion
+            -Werror=implicit-function-declaration
+            -Werror=incompatible-pointer-types
+        )
+    endif()
+
+    option(TRACEY_WARNINGS_AS_ERRORS "Treat warnings as errors" OFF)
+    if(TRACEY_WARNINGS_AS_ERRORS)
+        target_compile_options(tracey_warnings INTERFACE -Werror)
+    endif()
   
 elseif(CMAKE_C_COMPILER_ID STREQUAL "MSVC")  
     target_compile_options(tracey_warnings INTERFACE  
