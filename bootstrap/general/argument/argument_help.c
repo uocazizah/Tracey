@@ -4,9 +4,10 @@
 
 void tracey_args_print_help(const tracey_args_config_t* config, FILE* out)
 {
-    if (!out) out = stdout;
     const char* prog = (config && config->program_name) ? config->program_name : "tracey";
     const char* desc = (config && config->description) ? config->description : "";
+
+    if (!out) out = stdout;
 
     fprintf(out, "Usage: %s [options] [input_files...]\n", prog);
     if (*desc) fprintf(out, "%s\n\n", desc);
@@ -25,8 +26,10 @@ void tracey_args_print_help(const tracey_args_config_t* config, FILE* out)
 
 void tracey_args_print_version(const tracey_args_config_t* config, FILE* out)
 {
-    if (!out) out = stdout;
     const char* prog = (config && config->program_name) ? config->program_name : "tracey";
     const char* ver = (config && config->version_string) ? config->version_string : "unknown";
+
+    if (!out) out = stdout;
+
     fprintf(out, "%s version %s\n", prog, ver);
 }
