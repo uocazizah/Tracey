@@ -19,7 +19,7 @@ void tracey_args_print_debug(const tracey_args_t* args, FILE* out)
     if (args->input_count > 0) {
         fprintf(out, "[");
         for (size_t i = 0; i < args->input_count; i++) {
-            fprintf(out, "%s%s", args->input_files[i], (i + 1 < args->input_count) ? ", " : "");
+            fprintf(out, "%s%s", (const char*)args->input_files[i], (i + 1 < args->input_count) ? ", " : "");
         }
         fprintf(out, "] (count=%zu)\n", args->input_count);
     } else {
@@ -32,7 +32,7 @@ void tracey_args_print_debug(const tracey_args_t* args, FILE* out)
     if (args->include_count > 0) {
         fprintf(out, "[");
         for (size_t i = 0; i < args->include_count; i++) {
-            fprintf(out, "%s%s", args->include_paths[i], (i + 1 < args->include_count) ? ", " : "");
+            fprintf(out, "%s%s", (const char*)args->include_paths[i], (i + 1 < args->include_count) ? ", " : "");
         }
         fprintf(out, "] (count=%zu)\n", args->include_count);
     } else {
@@ -43,7 +43,7 @@ void tracey_args_print_debug(const tracey_args_t* args, FILE* out)
     if (args->define_count > 0) {
         fprintf(out, "[");
         for (size_t i = 0; i < args->define_count; i++) {
-            fprintf(out, "%s%s", args->defines[i], (i + 1 < args->define_count) ? ", " : "");
+            fprintf(out, "%s%s", (const char*)args->defines[i], (i + 1 < args->define_count) ? ", " : "");
         }
         fprintf(out, "] (count=%zu)\n", args->define_count);
     } else {
