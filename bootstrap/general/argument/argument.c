@@ -19,6 +19,10 @@ void tracey_args_free(tracey_args_t* args)
 
 const char* tracey_args_strerror(tracey_args_result_t result)
 {
+#if defined(__clang__)
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wcovered-switch-default"
+#endif
     switch (result) {
         case TRACEY_ARGS_OK: return "Success";
         case TRACEY_ARGS_ERROR_NOMEM: return "Out of memory";
@@ -30,4 +34,7 @@ const char* tracey_args_strerror(tracey_args_result_t result)
         case TRACEY_ARGS_VERSION_REQUESTED: return "Version requested";
         default: return "Unknown error";
     }
+#if defined(__clang__)
+#pragma clang diagnostic pop
+#endif
 }
