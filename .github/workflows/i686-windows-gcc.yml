@@ -28,7 +28,7 @@ jobs:
         shell: msys2 {0}
         run: |
           python3 -m pip install --upgrade pip
-          python3 -m pip install kconfiglib kbuild
+          python3 -m pip install kconfiglib
 
       - name: Build
         shell: msys2 {0}
