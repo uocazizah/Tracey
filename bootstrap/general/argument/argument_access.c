@@ -32,9 +32,12 @@ const char* tracey_args_get_define(const tracey_args_t* args, size_t index)
 
 const char* tracey_args_find_define(const tracey_args_t* args, const char* name)
 {
+    size_t name_len;
+    size_t i;
+
     if (!args || !name) return NULL;
-    size_t name_len = strlen(name);
-    for (size_t i = 0; i < args->define_count; i++) {
+    name_len = strlen(name);
+    for (i = 0; i < args->define_count; i++) {
         const char* def = args->defines[i];
         if (strncmp(def, name, name_len) == 0 && (def[name_len] == '\0' || def[name_len] == '=')) {
             return def;
@@ -45,8 +48,9 @@ const char* tracey_args_find_define(const tracey_args_t* args, const char* name)
 
 bool tracey_args_has_include_path(const tracey_args_t* args, const char* path)
 {
+    size_t i;
     if (!args || !path) return false;
-    for (size_t i = 0; i < args->include_count; i++) {
+    for (i = 0; i < args->include_count; i++) {
         if (strcmp(args->include_paths[i], path) == 0) return true;
     }
     return false;
