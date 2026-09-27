@@ -21,6 +21,10 @@ int main(int argc, char** argv)
     result = tracey_args_parse(&args, argc, argv, &config);
 
     switch (result) {
+#if defined(__clang__)
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wcovered-switch-default"
+#endif
         case TRACEY_ARGS_HELP_REQUESTED:
             tracey_args_print_help(&config, stdout);
             tracey_args_free(args);
@@ -52,12 +56,20 @@ int main(int argc, char** argv)
             return 1;
 
         case TRACEY_ARGS_ERROR_INVALID:
+            fprintf(stderr, "Error: %s\n", tracey_args_strerror(result));
+            tracey_args_print_help(&config, stderr);
+            if (args) tracey_args_free(args);
+            return 1;
+
         default:
             fprintf(stderr, "Error: %s\n", tracey_args_strerror(result));
             tracey_args_print_help(&config, stderr);
             if (args) tracey_args_free(args);
             return 1;
     }
+#if defined(__clang__)
+#pragma clang diagnostic pop
+#endif
 
     /* Read input files */
     input_count = tracey_args_input_count(args);
@@ -74,7 +86,7 @@ int main(int argc, char** argv)
             const char* path = tracey_args_get_input(args, i);
             sources[i] = tracey_source_read(path);
             if (!sources[i]) {
-                fprintf(stderr, "Error: Failed to read file '%s'\n", path);
+                fprintf(stderr, "Error: Failed to read input file\n");
                 for (size_t j = 0; j < i; j++) {
                     tracey_source_free(sources[j]);
                 }
