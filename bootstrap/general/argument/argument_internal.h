@@ -9,10 +9,10 @@
 /* Internal structure definition - only visible to argument implementation files */
 struct tracey_args {
     /* Pointers first (8-byte aligned on 64-bit) */
-    char** input_files;
-    char** include_paths;
-    char** defines;
-    char* output_file;
+    void** input_files;
+    void** include_paths;
+    void** defines;
+    const char* output_file;
     const char* program_name;
     const char* version_string;
 
@@ -36,7 +36,7 @@ struct tracey_args {
 
 /* Internal utility declarations */
 tracey_args_result_t args_ensure_capacity(void*** array, size_t* count, size_t* capacity);
-tracey_args_result_t args_add_string(char*** array, size_t* count, size_t* capacity, const char* str);
-void args_free_array(char** array);
+tracey_args_result_t args_add_string(void*** array, size_t* count, size_t* capacity, const char* str);
+void args_free_array(void** array);
 
 #endif /* TRACEY_ARGUMENT_INTERNAL_H */
