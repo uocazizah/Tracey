@@ -38,7 +38,7 @@ jobs:
             cd build
 
             python3 -m pip install --upgrade pip
-            python3 -m pip install kconfiglib kbuild
+            python3 -m pip install kconfiglib
 
             cmake .. \
               -DARCH=native \
