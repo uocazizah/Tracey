@@ -1,5 +1,6 @@
 #include <tracey/argument.h>
 #include <tracey/source.h>
+#include <tracey/lexer.h>
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -105,6 +106,33 @@ int main(int argc, char** argv)
             if (i > 0) fprintf(stdout, "\n");
             tracey_source_print_debug(sources[i], stdout);
         }
+    }
+
+    /* Lexical analysis */
+    for (i = 0; i < input_count; i++) {
+        const char* path = tracey_args_get_input(args, i);
+        const char* content = tracey_source_content(sources[i]);
+        size_t size = tracey_source_size(sources[i]);
+
+        fprintf(stdout, "\n=== Lexical Analysis: %s ===\n", path);
+
+        tracey_lexer_t* lexer = tracey_lexer_create(content, size);
+        if (!lexer) {
+            fprintf(stderr, "Error: Failed to create lexer for %s\n", path);
+            continue;
+        }
+
+        tracey_token_t token;
+        do {
+            token = tracey_lexer_next_token(lexer);
+            tracey_token_print_debug(&token, stdout);
+        } while (token.type != TRACEY_TOKEN_EOF && token.type != TRACEY_TOKEN_ERROR);
+
+        if (token.type == TRACEY_TOKEN_ERROR) {
+            fprintf(stderr, "Lexer error at line %zu, column %zu\n", token.line, token.column);
+        }
+
+        tracey_lexer_free(lexer);
     }
 
     /* Cleanup */
