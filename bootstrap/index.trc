@@ -1,2 +1,3 @@
-hello World, function open now available!
-I love Azizah so much <3
+int main() {
+    return 0;
+}

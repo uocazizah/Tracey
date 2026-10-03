@@ -123,7 +123,8 @@ tracey_args_result_t tracey_args_parse(tracey_args_t** out_args, int argc, char*
                     tracey_args_free(args);
                     return res;
                 }
-                if (strlen(level) != 1 || level[0] < '0' || level[0] > '3') {
+                /* Exactly one digit '0'-'3'; reads at most 2 bytes (CWE-126) */
+                if (level[0] < '0' || level[0] > '3' || level[1] != '\0') {
                     tracey_args_free(args);
                     return TRACEY_ARGS_ERROR_INVALID;
                 }
@@ -131,7 +132,8 @@ tracey_args_result_t tracey_args_parse(tracey_args_t** out_args, int argc, char*
             }
             else if (strncmp(arg, "--optimize=", 11) == 0) {
                 const char* level = arg + 11;
-                if (strlen(level) != 1 || level[0] < '0' || level[0] > '3') {
+                /* Exactly one digit '0'-'3'; reads at most 2 bytes (CWE-126) */
+                if (level[0] < '0' || level[0] > '3' || level[1] != '\0') {
                     tracey_args_free(args);
                     return TRACEY_ARGS_ERROR_INVALID;
                 }
@@ -181,7 +183,8 @@ static tracey_args_result_t parse_optimization(const char* arg, int* i, int argc
         if (*i + 1 >= argc) return TRACEY_ARGS_ERROR_MISSING_ARG;
         level_str = argv[++(*i)];
     }
-    if (strlen(level_str) != 1 || level_str[0] < '0' || level_str[0] > '3') {
+    /* Exactly one digit '0'-'3'; reads at most 2 bytes (CWE-126) */
+    if (level_str[0] < '0' || level_str[0] > '3' || level_str[1] != '\0') {
         return TRACEY_ARGS_ERROR_INVALID;
     }
     *out = (tracey_opt_level_t)(level_str[0] - '0');

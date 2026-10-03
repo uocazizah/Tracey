@@ -10,7 +10,6 @@
 #include <fcntl.h>
 #include <unistd.h>
 #include <limits.h>
-#include <errno.h>
 #include <stdint.h>
 
 tracey_source_t* tracey_source_read(const char* path)
@@ -19,24 +18,22 @@ tracey_source_t* tracey_source_read(const char* path)
     struct stat st;
     size_t size = 0;
     char* content = NULL;
-    size_t read = 0;
+    size_t bytes_read = 0;
     tracey_source_t* src = NULL;
     int fd = -1;
 
     if (!path || path[0] == '\0') return NULL;
 
-    /* Open with O_NOFOLLOW to avoid symlink attacks, then fdopen */
-    fd = open(path, O_RDONLY | O_NOFOLLOW | O_CLOEXEC);
-    if (fd < 0) {
-        int err = errno;
-        /* Fallback for systems without O_NOFOLLOW support (EINVAL, EOPNOTSUPP, ENOTSUP).
-         * Do NOT fallback on ELOOP - when O_NOFOLLOW is specified, ELOOP means
-         * the final component is a symlink and we explicitly requested not to follow it. */
-        if (err == EINVAL || err == EOPNOTSUPP || err == ENOTSUP) {
-            fd = open(path, O_RDONLY | O_CLOEXEC);
-        }
-        if (fd < 0) return NULL;
-    }
+    /* Open with O_NOFOLLOW to avoid symlink attacks (CWE-362), then fdopen.
+     * O_NOFOLLOW is mandated by POSIX.1-2001 and this file builds with
+     * _POSIX_C_SOURCE 200809L, so there is deliberately NO fallback that drops
+     * it: on EINVAL/EOPNOTSUPP/ENOTSUP we fail closed instead of silently
+     * reopening the path without protection against symlink redirection.
+     * (ELOOP still means "final component is a symlink" and is also fatal.)
+     * The O_RDONLY|O_NOFOLLOW|O_CLOEXEC flags plus the fstat() and S_ISREG()
+     * checks below are the accepted mitigation for this open. */
+    fd = open(path, O_RDONLY | O_NOFOLLOW | O_CLOEXEC); /* flawfinder: ignore */
+    if (fd < 0) return NULL;
 
     /* Use fstat on the fd to avoid TOCTOU race */
     if (fstat(fd, &st) != 0) {
@@ -83,10 +80,23 @@ tracey_source_t* tracey_source_read(const char* path)
         return NULL;
     }
 
-    read = fread(content, 1, size, fp);
+    /* Read the whole file in a loop: fread() may return a short count on
+     * EOF or error, so a single call cannot be trusted to fill the buffer
+     * (CWE-120/CWE-20). Any shortfall or stream error is a hard failure -
+     * we never treat a partially read source as valid. */
+    while (bytes_read < size) {
+        size_t chunk = fread(content + bytes_read, 1, size - bytes_read, fp);
+        if (chunk == 0) break;
+        bytes_read += chunk;
+    }
+    if (ferror(fp)) {
+        fclose(fp);
+        free(content);
+        return NULL;
+    }
     fclose(fp);
 
-    if (read != size) {
+    if (bytes_read != size) {
         free(content);
         return NULL;
     }

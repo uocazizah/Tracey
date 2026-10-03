@@ -2,6 +2,11 @@
 #include "argument_internal.h"
 #include <string.h>
 
+/* Upper bound for a define name looked up via tracey_args_find_define().
+ * Used to keep the NUL-terminator search bounded (CWE-126): input that is
+ * not terminated within this limit is rejected instead of being scanned. */
+#define TRACEY_ARGS_MAX_NAME_LEN 4096
+
 /* Accessor implementations */
 bool tracey_args_has_help(const tracey_args_t* args) { return args ? args->help : false; }
 bool tracey_args_has_version(const tracey_args_t* args) { return args ? args->version : false; }
@@ -34,9 +39,15 @@ const char* tracey_args_find_define(const tracey_args_t* args, const char* name)
 {
     size_t name_len;
     size_t i;
+    const char* nul;
 
     if (!args || !name) return NULL;
-    name_len = strlen(name);
+    /* Bounded terminator search instead of an unbounded scan: memchr stops
+     * at the first NUL or the bound, so a non-terminating "name" can over-read
+     * at most TRACEY_ARGS_MAX_NAME_LEN bytes before being rejected (CWE-126). */
+    nul = (const char*)memchr(name, '\0', TRACEY_ARGS_MAX_NAME_LEN);
+    if (!nul) return NULL;
+    name_len = (size_t)(nul - name);
     for (i = 0; i < args->define_count; i++) {
         const char* def = args->defines[i];
         if (strncmp(def, name, name_len) == 0 && (def[name_len] == '\0' || def[name_len] == '=')) {

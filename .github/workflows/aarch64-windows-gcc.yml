@@ -26,8 +26,8 @@ jobs:
       - name: Install Python dependencies
         shell: msys2 {0}
         run: |
-          python3 -m pip install --upgrade pip
-          python3 -m pip install kconfiglib
+          python3 -m pip install --upgrade --break-system-packages pip
+          python3 -m pip install --break-system-packages kconfiglib
 
       - name: Build
         shell: msys2 {0}

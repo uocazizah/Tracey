@@ -301,10 +301,11 @@ else()
     message(STATUS "Threads not found — building without optional threading support")  
 endif()  
   
-file(GLOB_RECURSE TRACEY_SOURCES CONFIGURE_DEPENDS  
-    "${CMAKE_CURRENT_SOURCE_DIR}/index.c"  
-    "${CMAKE_CURRENT_SOURCE_DIR}/general/*.c"  
-)  
+file(GLOB_RECURSE TRACEY_SOURCES CONFIGURE_DEPENDS
+    "${CMAKE_CURRENT_SOURCE_DIR}/index.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/general/*.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/general/lexer/*.c"
+)
   
 add_executable(traceyc ${TRACEY_SOURCES})
 
