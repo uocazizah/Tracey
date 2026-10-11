@@ -3,18 +3,18 @@ cmake_minimum_required(VERSION 3.15...3.30)
 project(tracey  
     VERSION 1.0  
     DESCRIPTION "Tracey compiler"  
-    LANGUAGES C  
+    LANGUAGES CXX  
 )  
   
-set(CMAKE_C_STANDARD 17)  
-set(CMAKE_C_STANDARD_REQUIRED ON)  
-set(CMAKE_C_EXTENSIONS OFF)  
+set(CMAKE_CXX_STANDARD 26)  
+set(CMAKE_CXX_STANDARD_REQUIRED ON)  
+set(CMAKE_CXX_EXTENSIONS OFF)  
   
 if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)  
     set(CMAKE_BUILD_TYPE Debug CACHE STRING "Build type" FORCE)  
 endif()  
   
-set(CMAKE_C_FLAGS_DEBUG "-g -O0")  
+set(CMAKE_CXX_FLAGS_DEBUG "-g -O0")  
   
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)  
 
@@ -112,7 +112,7 @@ endif()
   
 add_library(tracey_warnings INTERFACE)
 
-if(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
+if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
     # Common flags for both GCC and Clang
     target_compile_options(tracey_warnings INTERFACE
         -Wall
@@ -140,23 +140,19 @@ if(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
         -Wredundant-decls
         -Wdeprecated
         -Wsign-compare
-        -Wbad-function-cast
-        -Wnested-externs
-        -Wjump-misses-init
         -Wvariadic-macros
+        -Wsuggest-override
+        -Wnon-virtual-dtor
+        -Woverloaded-virtual
     )
 
     # GCC-specific flags
-    if(CMAKE_C_COMPILER_ID STREQUAL "GNU")
+    if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
         target_compile_options(tracey_warnings INTERFACE
             -Wduplicated-cond
             -Wmaybe-uninitialized
             -Wstrict-aliasing=3
             -Wstrict-overflow=5
-            -Wmissing-prototypes
-            -Wstrict-prototypes
-            -Wold-style-definition
-            -Wdeclaration-after-statement
             -Wvla
             -Wduplicated-branches
             -Wlogical-op
@@ -180,25 +176,19 @@ if(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
             -Wstringop-truncation
             -Wshift-overflow
             -Wpacked
-            -Wpadded
-            -Wpointer-sign
             -Wreturn-local-addr
             -Wsequence-point
-            -Wsizeof-array-argument
             -Wsizeof-pointer-memaccess
             -Wtrigraphs
             -Wunused-macros
             -Wvolatile-register-var
             -Wzero-length-bounds
             -Wdisabled-optimization
-            -Werror=implicit-function-declaration
-            -Werror=incompatible-pointer-types
-            -Werror=int-conversion
         )
     endif()
 
     # Clang-specific flags
-    if(CMAKE_C_COMPILER_ID STREQUAL "Clang")
+    if(CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
         target_compile_options(tracey_warnings INTERFACE
             -Wextra-semi
             -Wtautological-compare
@@ -216,11 +206,9 @@ if(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
             -Wunused-value
             -Wnewline-eof
             -Wcomma
-            -Wempty-translation-unit
+            -Wjump-misses-init
             -Wfloat-overflow-conversion
             -Wfloat-zero-conversion
-            -Werror=implicit-function-declaration
-            -Werror=incompatible-pointer-types
         )
     endif()
 
@@ -229,7 +217,7 @@ if(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
         target_compile_options(tracey_warnings INTERFACE -Werror)
     endif()
   
-elseif(CMAKE_C_COMPILER_ID STREQUAL "MSVC")  
+elseif(CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
     target_compile_options(tracey_warnings INTERFACE  
         /Wall  
         /wd4100  
@@ -266,22 +254,22 @@ endif()
   
 add_library(tracey_optional_deps INTERFACE)  
   
-include(CheckIncludeFile)  
+include(CheckIncludeFileCXX)  
   
-# Essential C standard headers (all mandatory in hosted C17, but still useful to verify)  
-check_include_file("stdio.h"     HAVE_STDIO_H)  
-check_include_file("stdlib.h"    HAVE_STDLIB_H)  
-check_include_file("string.h"    HAVE_STRING_H)  
-check_include_file("stddef.h"    HAVE_STDDEF_H)  
-check_include_file("stdint.h"    HAVE_STDINT_H)     # C99/C11  
-check_include_file("inttypes.h"  HAVE_INTTYPES_H)   # C99/C11  
-check_include_file("limits.h"    HAVE_LIMITS_H)  
-check_include_file("math.h"      HAVE_MATH_H)  
+# Essential C++ standard headers (sanity-check the toolchain's C++ library)  
+check_include_file_cxx("stdio.h"     HAVE_STDIO_H)  
+check_include_file_cxx("stdlib.h"    HAVE_STDLIB_H)  
+check_include_file_cxx("string.h"    HAVE_STRING_H)  
+check_include_file_cxx("stddef.h"    HAVE_STDDEF_H)  
+check_include_file_cxx("stdint.h"    HAVE_STDINT_H)     # C99/C11  
+check_include_file_cxx("inttypes.h"  HAVE_INTTYPES_H)   # C99/C11  
+check_include_file_cxx("limits.h"    HAVE_LIMITS_H)  
+check_include_file_cxx("math.h"      HAVE_MATH_H)  
   
 # Optional POSIX / system headers (you may want these)  
-check_include_file("unistd.h"    HAVE_UNISTD_H)  
-check_include_file("sys/types.h" HAVE_SYS_TYPES_H)  
-check_include_file("fcntl.h"     HAVE_FCNTL_H)  
+check_include_file_cxx("unistd.h"    HAVE_UNISTD_H)  
+check_include_file_cxx("sys/types.h" HAVE_SYS_TYPES_H)  
+check_include_file_cxx("fcntl.h"     HAVE_FCNTL_H)  
   
 find_package(ZLIB QUIET)  
 if(ZLIB_FOUND)  
@@ -302,12 +290,16 @@ else()
 endif()  
   
 file(GLOB_RECURSE TRACEY_SOURCES CONFIGURE_DEPENDS
-    "${CMAKE_CURRENT_SOURCE_DIR}/index.c"
-    "${CMAKE_CURRENT_SOURCE_DIR}/general/*.c"
-    "${CMAKE_CURRENT_SOURCE_DIR}/general/lexer/*.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/index.cxx"
+    "${CMAKE_CURRENT_SOURCE_DIR}/general/*.cxx"
 )
   
 add_executable(traceyc ${TRACEY_SOURCES})
+
+# Enforce the C++26 feature level explicitly (belt-and-braces beside
+# CMAKE_CXX_STANDARD, so a stray override can't silently drop us to an older
+# dialect).
+target_compile_features(traceyc PRIVATE cxx_std_26)
 
 # >>> KCONFIG >>> tambahkan dependency
 add_dependencies(traceyc tracey_kconfig_header)
