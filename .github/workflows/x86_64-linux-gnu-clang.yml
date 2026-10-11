@@ -14,11 +14,13 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y \
-            clang \
-            llvm \
+            clang-18 \
+            llvm-18 \
             cmake \
             pkg-config \
-            python3-pip
+            python3-pip \
+            g++-14 \
+            libstdc++-14-dev
 
       - name: Install Python dependencies
         run: |
@@ -31,7 +33,7 @@ jobs:
           mkdir -p build && cd build
 
           cmake .. -DARCH=native \
-            -DCMAKE_C_COMPILER=clang \
-            -DCMAKE_CXX_COMPILER=clang++
+            -DCMAKE_C_COMPILER=clang-18 \
+            -DCMAKE_CXX_COMPILER=clang++-18
 
           cmake --build . --verbose

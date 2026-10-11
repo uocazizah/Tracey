@@ -14,13 +14,15 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y \
-            clang \
-            llvm \
+            clang-18 \
+            llvm-18 \
             cmake \
             pkg-config \
             gcc-arm-linux-gnueabihf \
             g++-arm-linux-gnueabihf \
-            python3-pip
+            python3-pip \
+            g++-14 \
+            libstdc++-14-dev
 
       - name: Install Python dependencies
         run: |
@@ -36,8 +38,8 @@ jobs:
             -DARCH=native \
             -DCMAKE_SYSTEM_NAME=Linux \
             -DCMAKE_SYSTEM_PROCESSOR=arm \
-            -DCMAKE_C_COMPILER=clang \
-            -DCMAKE_CXX_COMPILER=clang++ \
+            -DCMAKE_C_COMPILER=clang-18 \
+            -DCMAKE_CXX_COMPILER=clang++-18 \
             -DCMAKE_C_FLAGS="--target=arm-linux-gnueabihf" \
             -DCMAKE_CXX_FLAGS="--target=arm-linux-gnueabihf"
 

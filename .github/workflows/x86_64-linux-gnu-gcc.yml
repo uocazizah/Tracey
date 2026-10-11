@@ -17,6 +17,8 @@ jobs:
             build-essential \
             gcc \
             g++ \
+            gcc-14 \
+            g++-14 \
             cmake \
             pkg-config \
             python3-pip
@@ -31,6 +33,7 @@ jobs:
           cd bootstrap
           mkdir -p build && cd build
 
-          cmake .. -DARCH=native
+          cmake .. -DARCH=native \
+            -DCMAKE_CXX_COMPILER=g++-14
 
           cmake --build . --verbose
