@@ -1,0 +1,126 @@
+name: Build
+
+on:
+  pull_request:
+
+jobs:
+  build:
+    name: ${{ matrix.name }}
+    runs-on: ${{ matrix.runs_on }}
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # --- x86_64 (native) ---
+          - name: GCC x86_64 Linux GNU
+            runs_on: ubuntu-latest
+            packages: build-essential gcc g++ gcc-14 g++-14 cmake pkg-config python3-pip
+            cxx: g++-14
+            cxxflags: ""
+            cross: "false"
+            cross_arch: ""
+            run_smoke: "true"
+
+          - name: Clang x86_64 Linux GNU
+            runs_on: ubuntu-latest
+            packages: clang-18 llvm-18 cmake pkg-config python3-pip g++-14 libstdc++-14-dev
+            cxx: clang++-18
+            cxxflags: ""
+            cross: "false"
+            cross_arch: ""
+            run_smoke: "true"
+
+          # --- aarch64 (native on ARM runner) ---
+          - name: GCC AArch64 Linux GNU
+            runs_on: ubuntu-24.04-arm
+            packages: build-essential gcc-14 g++-14 cmake pkg-config python3-pip
+            cxx: g++-14
+            cxxflags: ""
+            cross: "false"
+            cross_arch: ""
+            run_smoke: "true"
+
+          - name: Clang AArch64 Linux GNU
+            runs_on: ubuntu-24.04-arm
+            packages: clang-18 llvm-18 cmake pkg-config python3-pip g++-14 libstdc++-14-dev
+            cxx: clang++-18
+            cxxflags: ""
+            cross: "false"
+            cross_arch: ""
+            run_smoke: "true"
+
+          # --- i686 (cross, cannot execute on host) ---
+          - name: GCC i686 Linux GNU
+            runs_on: ubuntu-latest
+            packages: cmake pkg-config gcc-i686-linux-gnu g++-i686-linux-gnu python3-pip
+            cxx: i686-linux-gnu-g++
+            cxxflags: ""
+            cross: "true"
+            cross_arch: i686
+            run_smoke: "false"
+
+          - name: Clang i686 Linux GNU
+            runs_on: ubuntu-latest
+            packages: clang-18 llvm-18 gcc-i686-linux-gnu g++-i686-linux-gnu cmake pkg-config python3-pip g++-14 libstdc++-14-dev
+            cxx: clang++-18
+            cxxflags: "--target=i686-linux-gnu"
+            cross: "true"
+            cross_arch: i686
+            run_smoke: "false"
+
+          # --- armhf (cross, cannot execute on host) ---
+          - name: GCC ARMHF Linux GNU
+            runs_on: ubuntu-24.04-arm
+            packages: cmake pkg-config gcc-arm-linux-gnueabihf g++-arm-linux-gnueabihf python3-pip
+            cxx: g++-arm-linux-gnueabihf
+            cxxflags: ""
+            cross: "true"
+            cross_arch: arm
+            run_smoke: "false"
+
+          - name: Clang ARMHF Linux GNU
+            runs_on: ubuntu-24.04-arm
+            packages: cmake pkg-config clang-18 llvm-18 gcc-arm-linux-gnueabihf g++-arm-linux-gnueabihf python3-pip g++-14 libstdc++-14-dev
+            cxx: clang++-18
+            cxxflags: "--target=arm-linux-gnueabihf"
+            cross: "true"
+            cross_arch: arm
+            run_smoke: "false"
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ${{ matrix.packages }}
+
+      - name: Install Python dependencies
+        run: |
+          python3 -m pip install --upgrade pip
+          python3 -m pip install kconfiglib
+
+      - name: Configure
+        run: |
+          ARGS=(-DARCH=native -DCMAKE_CXX_COMPILER="${{ matrix.cxx }}")
+
+          if [ -n "${{ matrix.cxxflags }}" ]; then
+            ARGS+=(-DCMAKE_CXX_FLAGS="${{ matrix.cxxflags }}")
+          fi
+
+          if [ "${{ matrix.cross }}" = "true" ]; then
+            ARGS+=(-DCMAKE_SYSTEM_NAME=Linux -DCMAKE_SYSTEM_PROCESSOR=${{ matrix.cross_arch }})
+          fi
+
+          cmake -S bootstrap -B bootstrap/build "${ARGS[@]}"
+
+      - name: Build
+        run: cmake --build bootstrap/build --verbose
+
+      - name: Smoke test
+        if: matrix.run_smoke == 'true'
+        run: |
+          ./bootstrap/build/traceyc bootstrap/index.trc
+          ./bootstrap/build/traceyc --version
+          ./bootstrap/build/traceyc --help
