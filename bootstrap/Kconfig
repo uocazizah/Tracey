@@ -6,14 +6,14 @@ config TRACEY_DEBUG_TRACE
     bool "Enable runtime debug tracing"
     default n
     help
-      Cetak informasi tracing verbose saat runtime.
+      Print verbose tracing information at runtime.
 
 config TRACEY_MAX_SOURCE_SIZE
     int "Maximum source file size (bytes)"
     range 4096 1048576
     default 65536
     help
-      Batas ukuran sumber yang diterima dalam byte.
+      Maximum accepted source size, in bytes.
 
 config TRACEY_STACK_SIZE
     int "Internal stack size"
