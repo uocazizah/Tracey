@@ -1,6 +1,6 @@
 #include <tracey/source.hxx>
 
-#include "config.h"
+#include <tracey/config.hxx>
 
 #include <cstdint>
 #include <fstream>
@@ -16,8 +16,9 @@
 
 namespace {
 
-/* Maximum accepted source size, enforced on every platform. */
-constexpr std::size_t kMaxSourceSize = static_cast<std::size_t>(CONFIG_TRACEY_MAX_SOURCE_SIZE);
+/* Maximum accepted source size, enforced on every platform. Resolved from the
+ * Kconfig symbol CONFIG_TRACEY_MAX_SOURCE_SIZE via tracey::config. */
+constexpr std::size_t kMaxSourceSize = tracey::config::max_source_size;
 
 #if defined(__unix__)
 /* RAII wrapper for a raw file descriptor. */
@@ -151,6 +152,8 @@ std::expected<source, source_error> source::read_posix(const std::filesystem::pa
     if (std::ferror(fh.fp)) return std::unexpected(source_error::read_failed);
     if (bytes_read != size) return std::unexpected(source_error::read_failed);
 
+    TRACEY_TRACE("[source] read '{}' ({} bytes)\n", path_str, size);
+
     return source{std::filesystem::path{path_str}, std::move(content)};
 }
 #endif /* __unix__ */
@@ -181,7 +184,30 @@ std::expected<source, source_error> source::read_portable(const std::filesystem:
         return std::unexpected(source_error::read_failed);
     }
 
+    TRACEY_TRACE("[source] read '{}' ({} bytes, portable path)\n",
+                 path.string(), file_size);
+
     return source{path, std::move(content)};
+}
+
+std::string_view to_string(source_error e) noexcept
+{
+#if defined(__clang__)
+    #pragma clang diagnostic push
+    #pragma clang diagnostic ignored "-Wcovered-switch-default"
+#endif
+    switch (e) {
+        case source_error::invalid_path:      return "Invalid path";
+        case source_error::open_failed:       return "Failed to open file";
+        case source_error::not_regular_file:  return "Not a regular file";
+        case source_error::too_large:         return "File exceeds maximum source size";
+        case source_error::read_failed:       return "Failed to read file";
+        case source_error::no_memory:         return "Out of memory";
+        default:                              return "Unknown error";
+    }
+#if defined(__clang__)
+    #pragma clang diagnostic pop
+#endif
 }
 
 } /* namespace tracey */
