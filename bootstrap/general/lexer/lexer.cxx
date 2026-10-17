@@ -1,5 +1,7 @@
 #include <tracey/lexer.hxx>
 
+#include <tracey/config.hxx>
+
 #include <array>
 
 namespace {
@@ -43,7 +45,7 @@ lexer::lexer(std::string_view content) noexcept
 
 bool lexer::is_at_end() const noexcept
 {
-    return position_ >= content_.size();
+    return at_end();
 }
 
 std::size_t lexer::line() const noexcept
@@ -95,7 +97,7 @@ char lexer::current_next() const noexcept
     return content_[position_ + 1];
 }
 
-char lexer::advance()
+char lexer::advance() noexcept
 {
     if (at_end()) return '\0';
 
@@ -112,7 +114,7 @@ char lexer::advance()
     return c;
 }
 
-bool lexer::match(char expected)
+bool lexer::match(char expected) noexcept
 {
     if (at_end()) return false;
     if (content_[position_] != expected) return false;
@@ -137,32 +139,42 @@ token lexer::scan_token()
 {
     skip_whitespace();
 
+    /* Capture the token's start position *before* consuming the first
+     * character: `advance()` mutates line_/column_, so we snapshot them
+     * here and thread them through to make_token(). This keeps line/column
+     * tracking O(1) per token instead of rescanning the source. */
+    const std::size_t start_pos = position_;
+    const std::size_t start_line = line_;
+    const std::size_t start_column = column_;
+
     if (at_end()) {
-        return make_token(token_type::eof, position_, 0);
+        return make_token(token_type::eof, start_pos, 0, start_line, start_column);
     }
 
-    const std::size_t start_pos = position_;
     const char c = advance();
 
     switch (c) {
-        case '(': return make_token(token_type::lparen, start_pos, 1);
-        case ')': return make_token(token_type::rparen, start_pos, 1);
-        case '{': return make_token(token_type::lbrace, start_pos, 1);
-        case '}': return make_token(token_type::rbrace, start_pos, 1);
-        case ';': return make_token(token_type::semicolon, start_pos, 1);
+        case '(': return make_token(token_type::lparen, start_pos, 1, start_line, start_column);
+        case ')': return make_token(token_type::rparen, start_pos, 1, start_line, start_column);
+        case '{': return make_token(token_type::lbrace, start_pos, 1, start_line, start_column);
+        case '}': return make_token(token_type::rbrace, start_pos, 1, start_line, start_column);
+        case ';': return make_token(token_type::semicolon, start_pos, 1, start_line, start_column);
 
         default:
             if (is_digit(c)) {
-                return scan_number(start_pos);
+                return scan_number(start_pos, start_line, start_column);
             }
             if (is_ident_start(c)) {
-                return scan_identifier(start_pos);
+                return scan_identifier(start_pos, start_line, start_column);
             }
-            return make_error_token(start_pos);
+            TRACEY_TRACE("[lexer] unexpected character '{}' at {}:{}\n",
+                         c, start_line, start_column);
+            return make_error_token(start_pos, start_line, start_column);
     }
 }
 
-token lexer::scan_identifier(std::size_t start_pos)
+token lexer::scan_identifier(std::size_t start_pos, std::size_t start_line,
+                             std::size_t start_column)
 {
     while (!at_end()) {
         const char c = current();
@@ -176,10 +188,11 @@ token lexer::scan_identifier(std::size_t start_pos)
     const std::size_t length = position_ - start_pos;
     const token_type type = check_keyword(content_.substr(start_pos, length));
 
-    return make_token(type, start_pos, length);
+    return make_token(type, start_pos, length, start_line, start_column);
 }
 
-token lexer::scan_number(std::size_t start_pos)
+token lexer::scan_number(std::size_t start_pos, std::size_t start_line,
+                         std::size_t start_column)
 {
     while (!at_end()) {
         const char c = current();
@@ -191,7 +204,7 @@ token lexer::scan_number(std::size_t start_pos)
     }
 
     const std::size_t length = position_ - start_pos;
-    return make_token(token_type::integer, start_pos, length);
+    return make_token(token_type::integer, start_pos, length, start_line, start_column);
 }
 
 token_type lexer::check_keyword(std::string_view text) noexcept
@@ -205,35 +218,24 @@ token_type lexer::check_keyword(std::string_view text) noexcept
 }
 
 token lexer::make_token(token_type type, std::size_t start_pos,
-                        std::size_t length) const noexcept
+                        std::size_t length, std::size_t line,
+                        std::size_t column) const noexcept
 {
     token t;
     t.type = type;
     t.lexeme = content_.substr(start_pos, length);
-
-    /* Calculate line/column for the token start by rescanning from the
-     * beginning (kept identical to the original C implementation). */
-    std::size_t line = 1;
-    std::size_t column = 1;
-
-    for (std::size_t i = 0; i < start_pos && i < content_.size(); i++) {
-        if (content_[i] == '\n') {
-            line++;
-            column = 1;
-        } else {
-            column++;
-        }
-    }
-
+    /* Line/column were snapshotted by the caller before the token was
+     * consumed — no rescan needed. */
     t.line = line;
     t.column = column;
 
     return t;
 }
 
-token lexer::make_error_token(std::size_t start_pos) const noexcept
+token lexer::make_error_token(std::size_t start_pos, std::size_t line,
+                              std::size_t column) const noexcept
 {
-    return make_token(token_type::error_, start_pos, 0);
+    return make_token(token_type::error_, start_pos, 0, line, column);
 }
 
 std::string_view to_string(token_type type) noexcept
