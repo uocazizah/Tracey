@@ -69,17 +69,24 @@ private:
     [[nodiscard]] bool at_end() const noexcept;
     [[nodiscard]] char current() const noexcept;
     [[nodiscard]] char current_next() const noexcept;
-    char advance();
-    bool match(char expected);
+    char advance() noexcept;
+    bool match(char expected) noexcept;
     void skip_whitespace() noexcept;
 
     [[nodiscard]] token scan_token();
-    [[nodiscard]] token scan_identifier(std::size_t start_pos);
-    [[nodiscard]] token scan_number(std::size_t start_pos);
+    [[nodiscard]] token scan_identifier(std::size_t start_pos,
+                                        std::size_t start_line,
+                                        std::size_t start_column);
+    [[nodiscard]] token scan_number(std::size_t start_pos,
+                                    std::size_t start_line,
+                                    std::size_t start_column);
 
     [[nodiscard]] token make_token(token_type type, std::size_t start_pos,
-                                   std::size_t length) const noexcept;
-    [[nodiscard]] token make_error_token(std::size_t start_pos) const noexcept;
+                                   std::size_t length, std::size_t line,
+                                   std::size_t column) const noexcept;
+    [[nodiscard]] token make_error_token(std::size_t start_pos,
+                                         std::size_t line,
+                                         std::size_t column) const noexcept;
 
     [[nodiscard]] static token_type check_keyword(std::string_view text) noexcept;
 
