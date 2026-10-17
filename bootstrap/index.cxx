@@ -1,4 +1,5 @@
 #include <tracey/argument.hxx>
+#include <tracey/config.hxx>
 #include <tracey/lexer.hxx>
 #include <tracey/source.hxx>
 
@@ -11,7 +12,7 @@ int main(int argc, char** argv)
 {
     tracey::args_config config;
     config.program_name = "traceyc";
-    config.version_string = "1.0.0";
+    config.version_string = tracey::config::version;
     config.description = "Tracey compiler - compile .trc files";
     config.allow_unknown_options = false;
     config.max_args = 10000;
@@ -65,7 +66,8 @@ int main(int argc, char** argv)
     for (const auto& path : inputs) {
         auto src = tracey::source::read(path);
         if (!src) {
-            std::print(stderr, "Error: Failed to read input file\n");
+            std::print(stderr, "Error: Failed to read input file '{}': {}\n",
+                       path, tracey::to_string(src.error()));
             return 1;
         }
         sources.push_back(std::move(*src));
@@ -82,6 +84,7 @@ int main(int argc, char** argv)
     }
 
     /* Lexical analysis */
+    bool had_lexer_error = false;
     for (std::size_t i = 0; i < sources.size(); i++) {
         const std::string& path = inputs[i];
         const tracey::source& src = sources[i];
@@ -98,8 +101,9 @@ int main(int argc, char** argv)
 
         if (token.type == tracey::token_type::error_) {
             std::print(stderr, "Lexer error at line {}, column {}\n", token.line, token.column);
+            had_lexer_error = true;
         }
     }
 
-    return 0;
+    return had_lexer_error ? 1 : 0;
 }
