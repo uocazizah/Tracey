@@ -56,6 +56,9 @@ private:
     std::string content_;
 };
 
+/* Human-readable message for a source error */
+[[nodiscard]] std::string_view to_string(source_error e) noexcept;
+
 } /* namespace tracey */
 
 #endif /* TRACEY_SOURCE_HXX */
