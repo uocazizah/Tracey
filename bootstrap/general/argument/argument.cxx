@@ -12,7 +12,7 @@ std::optional<std::string_view> args::find_define(std::string_view name) const n
 {
     if (name.empty()) return std::nullopt;
     for (const auto& def : defines_) {
-        /* Match if the define is exactly `name` or `name=value`. */
+        /** Match if the define is exactly `name` or `name=value`. */
         if (def == name) return std::string_view{def};
         if (def.starts_with(name) && def.size() > name.size() && def[name.size()] == '=') {
             return std::string_view{def};
@@ -48,4 +48,4 @@ std::string_view to_string(args_error e) noexcept
 #endif
 }
 
-} /* namespace tracey */
+} /** namespace tracey */

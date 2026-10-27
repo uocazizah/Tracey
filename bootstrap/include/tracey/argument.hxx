@@ -12,7 +12,7 @@
 
 namespace tracey {
 
-/* Optimization levels */
+/** Optimization levels */
 enum class opt_level : int {
     none = 0,
     level1 = 1,
@@ -20,7 +20,7 @@ enum class opt_level : int {
     level3 = 3,
 };
 
-/* Parse error codes */
+/** Parse error codes */
 enum class args_error {
     nomem,
     invalid,
@@ -29,7 +29,7 @@ enum class args_error {
     empty_arg,
 };
 
-/* Argument parser configuration */
+/** Argument parser configuration */
 struct args_config {
     std::string_view program_name{"tracey"};
     std::string_view version_string{"1.0.0"};
@@ -38,16 +38,23 @@ struct args_config {
     bool allow_unknown_options{false};
 };
 
-/* Command-line argument parser with value semantics and RAII ownership. */
+/**
+ * Command-line argument parser with value semantics and RAII ownership.
+ *
+ * Technical notes:
+ * - parse returns expected to avoid exceptions in control flow.
+ * - help/version short-circuit early for fast exit.
+ * - max_args guards against excessive input counts.
+ */
 class args {
 public:
     args() = default;
 
-    /* Parse command line arguments */
+    /** Parse command line arguments */
     [[nodiscard]] static std::expected<args, args_error>
     parse(int argc, char** argv, const args_config& config = {});
 
-    /* Accessors */
+    /** Accessors */
     [[nodiscard]] bool has_help() const noexcept { return help_; }
     [[nodiscard]] bool has_version() const noexcept { return version_; }
     [[nodiscard]] bool has_verbose() const noexcept { return verbose_; }
@@ -66,11 +73,11 @@ public:
 
     [[nodiscard]] bool has_include_path(std::string_view path) const noexcept;
 
-    /* Program identity (used by help/version/debug printing) */
+    /** Program identity (used by help/version/debug printing) */
     [[nodiscard]] std::string_view program_name() const noexcept { return program_name_; }
     [[nodiscard]] std::string_view version_string() const noexcept { return version_string_; }
 
-    /* Debug output of the parsed state */
+    /** Debug output of the parsed state */
     void print_debug(std::FILE* out = nullptr) const;
 
 private:
@@ -91,13 +98,13 @@ private:
     bool debug_info_{false};
 };
 
-/* Human-readable message for a parse error */
+/** Human-readable message for a parse error */
 [[nodiscard]] std::string_view to_string(args_error e) noexcept;
 
-/* Help and version printing (driven purely by the configuration) */
+/** Help and version printing (driven purely by the configuration) */
 void print_help(const args_config& config, std::FILE* out = nullptr);
 void print_version(const args_config& config, std::FILE* out = nullptr);
 
-} /* namespace tracey */
+} /** namespace tracey */
 
-#endif /* TRACEY_ARGUMENT_HXX */
+#endif /** TRACEY_ARGUMENT_HXX */

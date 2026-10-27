@@ -5,7 +5,7 @@
 
 namespace {
 
-/* Format a list of strings as "[a, b, c]" (parity with the original output). */
+/** Format a list of strings as "[a, b, c]" (parity with the original output). */
 [[nodiscard]] std::string format_list(std::span<const std::string> items)
 {
     std::string out{"["};
@@ -22,7 +22,7 @@ namespace {
     return v ? "true" : "false";
 }
 
-} /* anonymous namespace */
+} /** anonymous namespace */
 
 namespace tracey {
 
@@ -50,4 +50,4 @@ void args::print_debug(std::FILE* out) const
     std::print(out, "  Version: {}\n", bool_str(version_));
 }
 
-} /* namespace tracey */
+} /** namespace tracey */

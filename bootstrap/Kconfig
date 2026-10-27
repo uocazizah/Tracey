@@ -47,3 +47,27 @@ config TRACEY_USE_THREADS
     default y
 
 endmenu
+
+menu "Compiler modules"
+
+config TRACEY_MODULE_PARSER
+    bool "Enable parser module"
+    default y
+
+config TRACEY_MODULE_SEMANTIC
+    bool "Enable semantic analysis module"
+    default y
+
+config TRACEY_MODULE_CODEGEN
+    bool "Enable code generation module"
+    default y
+
+config TRACEY_MODULE_ASSEMBLER
+    bool "Enable internal assembler"
+    default y
+
+config TRACEY_MODULE_LINKER
+    bool "Enable internal linker"
+    default y
+
+endmenu

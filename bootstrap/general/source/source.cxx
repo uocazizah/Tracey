@@ -16,12 +16,17 @@
 
 namespace {
 
-/* Maximum accepted source size, enforced on every platform. Resolved from the
- * Kconfig symbol CONFIG_TRACEY_MAX_SOURCE_SIZE via tracey::config. */
+/**
+ * Maximum accepted source size, enforced on every platform.
+ *
+ * Technical notes:
+ * - Value comes from Kconfig via tracey::config::max_source_size.
+ * - Checked before allocation to avoid excessive memory use.
+ */
 constexpr std::size_t kMaxSourceSize = tracey::config::max_source_size;
 
 #if defined(__unix__)
-/* RAII wrapper for a raw file descriptor. */
+/** RAII wrapper for a raw file descriptor. */
 struct fd_holder {
     int fd{-1};
 
@@ -38,7 +43,7 @@ struct fd_holder {
         fd = f;
     }
 
-    /* Give up ownership without closing (e.g. after handing the fd to
+    /** Give up ownership without closing (e.g. after handing the fd to
      * fdopen, which now owns it). */
     int release() noexcept
     {
@@ -50,7 +55,7 @@ struct fd_holder {
     [[nodiscard]] bool valid() const noexcept { return fd >= 0; }
 };
 
-/* RAII wrapper for a std::FILE* (closes the stream, which also closes the
+/** RAII wrapper for a std::FILE* (closes the stream, which also closes the
  * underlying descriptor once ownership has been transferred). */
 struct file_holder {
     std::FILE* fp{nullptr};
@@ -70,9 +75,9 @@ struct file_holder {
 
     [[nodiscard]] bool valid() const noexcept { return fp != nullptr; }
 };
-#endif /* __unix__ */
+#endif /** __unix__ */
 
-} /* anonymous namespace */
+} /** anonymous namespace */
 
 namespace tracey {
 
@@ -91,7 +96,7 @@ std::expected<source, source_error> source::read_posix(const std::filesystem::pa
     const std::string path_str = path.string();
     if (path_str.empty()) return std::unexpected(source_error::invalid_path);
 
-    /* Open with O_NOFOLLOW to avoid symlink attacks (CWE-362), then fdopen.
+    /** Open with O_NOFOLLOW to avoid symlink attacks (CWE-362), then fdopen.
      * O_NOFOLLOW is mandated by POSIX.1-2001, so there is deliberately NO
      * fallback that drops it: on EINVAL/EOPNOTSUPP/ENOTSUP we fail closed
      * instead of silently reopening the path without protection against
@@ -99,17 +104,17 @@ std::expected<source, source_error> source::read_posix(const std::filesystem::pa
      * and is also fatal.) The O_RDONLY|O_NOFOLLOW|O_CLOEXEC flags plus the
      * fstat() and S_ISREG() checks below are the accepted mitigation for this
      * open. */
-    fd_holder fdh{::open(path_str.c_str(), O_RDONLY | O_NOFOLLOW | O_CLOEXEC)}; /* flawfinder: ignore */
+    fd_holder fdh{::open(path_str.c_str(), O_RDONLY | O_NOFOLLOW | O_CLOEXEC)}; /** flawfinder: ignore */
     if (!fdh.valid()) return std::unexpected(source_error::open_failed);
 
-    /* Use fstat on the fd to avoid TOCTOU race */
+    /** Use fstat on the fd to avoid TOCTOU race */
     struct stat st {};
     if (::fstat(fdh.fd, &st) != 0) return std::unexpected(source_error::open_failed);
 
-    /* Ensure it's a regular file (not a device, pipe, etc.) */
+    /** Ensure it's a regular file (not a device, pipe, etc.) */
     if (!S_ISREG(st.st_mode)) return std::unexpected(source_error::not_regular_file);
 
-    /* Check for integer overflow - st.st_size is signed, SIZE_MAX is unsigned.
+    /** Check for integer overflow - st.st_size is signed, SIZE_MAX is unsigned.
      * Reject a negative size or one that exceeds SIZE_MAX - 1. */
     if (st.st_size < 0) return std::unexpected(source_error::read_failed);
     if (static_cast<unsigned long long>(st.st_size) >
@@ -119,10 +124,10 @@ std::expected<source, source_error> source::read_posix(const std::filesystem::pa
 
     const auto size = static_cast<std::size_t>(st.st_size);
 
-    /* Enforce maximum source file size from Kconfig */
+    /** Enforce maximum source file size from Kconfig */
     if (size > kMaxSourceSize) return std::unexpected(source_error::too_large);
 
-    /* Convert fd to FILE* for buffered reading. fdopen takes ownership of the
+    /** Convert fd to FILE* for buffered reading. fdopen takes ownership of the
      * fd on success; on failure we still own it and must close it. */
     const int raw_fd = fdh.release();
     file_holder fh{::fdopen(raw_fd, "rb")};
@@ -138,7 +143,7 @@ std::expected<source, source_error> source::read_posix(const std::filesystem::pa
         return std::unexpected(source_error::no_memory);
     }
 
-    /* Read the whole file in a loop: fread() may return a short count on EOF
+    /** Read the whole file in a loop: fread() may return a short count on EOF
      * or error, so a single call cannot be trusted to fill the buffer
      * (CWE-120/CWE-20). Any shortfall or stream error is a hard failure - we
      * never treat a partially read source as valid. */
@@ -156,7 +161,7 @@ std::expected<source, source_error> source::read_posix(const std::filesystem::pa
 
     return source{std::filesystem::path{path_str}, std::move(content)};
 }
-#endif /* __unix__ */
+#endif /** __unix__ */
 
 std::expected<source, source_error> source::read_portable(const std::filesystem::path& path)
 {
@@ -210,4 +215,4 @@ std::string_view to_string(source_error e) noexcept
 #endif
 }
 
-} /* namespace tracey */
+} /** namespace tracey */

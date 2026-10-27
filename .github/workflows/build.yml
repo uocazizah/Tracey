@@ -118,6 +118,10 @@ jobs:
       - name: Build
         run: cmake --build bootstrap/build --verbose
 
+      - name: Run tests
+        if: matrix.run_smoke == 'true'
+        run: ctest --test-dir bootstrap/build --output-on-failure
+
       - name: Smoke test
         if: matrix.run_smoke == 'true'
         run: |

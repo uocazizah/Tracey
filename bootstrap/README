@@ -1,0 +1,10 @@
+# Tracey Bootstrap Compiler
+
+Build with Make:
+  make
+  make test
+  make clean
+  make menuconfig
+  make olddefconfig
+
+Standard: C++23.

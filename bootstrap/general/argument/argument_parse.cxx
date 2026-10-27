@@ -7,7 +7,7 @@ namespace {
 using tracey::args_error;
 using tracey::opt_level;
 
-/* Parse an option that requires a following argument (e.g. -o file, -I path).
+/** Parse an option that requires a following argument (e.g. -o file, -I path).
  * Consumes the next argv slot via the by-reference index `i`. */
 [[nodiscard]] std::expected<std::string_view, args_error>
 parse_option_with_arg(int& i, int argc, char** argv)
@@ -18,7 +18,7 @@ parse_option_with_arg(int& i, int argc, char** argv)
     return std::string_view{val};
 }
 
-/* Parse a single-digit optimization level '0'..'3' (exactly one character). */
+/** Parse a single-digit optimization level '0'..'3' (exactly one character). */
 [[nodiscard]] std::expected<opt_level, args_error>
 parse_opt_level(std::string_view level)
 {
@@ -28,7 +28,7 @@ parse_opt_level(std::string_view level)
     return static_cast<opt_level>(level[0] - '0');
 }
 
-/* Parse -O<level> or -O <level>. */
+/** Parse -O<level> or -O <level>. */
 [[nodiscard]] std::expected<opt_level, args_error>
 parse_optimization(std::string_view arg, int& i, int argc, char** argv)
 {
@@ -42,7 +42,7 @@ parse_optimization(std::string_view arg, int& i, int argc, char** argv)
     return parse_opt_level(level_str);
 }
 
-} /* anonymous namespace */
+} /** anonymous namespace */
 
 namespace tracey {
 
@@ -106,16 +106,16 @@ std::expected<args, args_error> args::parse(int argc, char** argv, const args_co
                 if (!level) return std::unexpected(level.error());
                 a.optimization_ = *level;
             } else if (!config.allow_unknown_options) {
-                /* Unknown --optimize* variant */
+                /** Unknown --optimize* variant */
                 return std::unexpected(args_error::invalid);
             }
         } else if (arg.starts_with('-')) {
             if (!config.allow_unknown_options) {
-                /* Unknown option */
+                /** Unknown option */
                 return std::unexpected(args_error::invalid);
             }
         } else {
-            /* Positional argument - input file */
+            /** Positional argument - input file */
             if (arg.empty()) return std::unexpected(args_error::empty_arg);
             a.inputs_.emplace_back(arg);
         }
@@ -124,4 +124,4 @@ std::expected<args, args_error> args::parse(int argc, char** argv, const args_co
     return a;
 }
 
-} /* namespace tracey */
+} /** namespace tracey */

@@ -41,7 +41,7 @@ bin/          Build output
 Development
 --------------
 
-Tracey is currently being developed using C.
+Tracey is currently being developed using C++ (C++26).
 
 Current focus:
 

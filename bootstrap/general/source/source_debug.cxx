@@ -22,4 +22,4 @@ void source::print_debug(std::FILE* out) const
     }
 }
 
-} /* namespace tracey */
+} /** namespace tracey */

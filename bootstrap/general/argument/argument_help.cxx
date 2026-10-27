@@ -29,4 +29,4 @@ void print_version(const args_config& config, std::FILE* out)
     std::print(out, "{} version {}\n", config.program_name, config.version_string);
 }
 
-} /* namespace tracey */
+} /** namespace tracey */
