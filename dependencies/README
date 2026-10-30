@@ -1,3 +1,7 @@
 dependencies
 
 for external packages & sources
+
+doctest/
+    Vendored doctest single-header unit test framework (v2.5.3, MIT).
+    Used by the bootstrap test suite; see bootstrap/test/.

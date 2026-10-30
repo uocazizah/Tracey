@@ -1,0 +1,9 @@
+#include <stdio.htrc>
+
+int main()
+{
+
+
+    print("hello world!");
+    return 0;
+}

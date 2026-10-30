@@ -101,30 +101,24 @@ jobs:
           python3 -m pip install --upgrade pip
           python3 -m pip install kconfiglib
 
-      - name: Configure
-        run: |
-          ARGS=(-DARCH=native -DCMAKE_CXX_COMPILER="${{ matrix.cxx }}")
-
-          if [ -n "${{ matrix.cxxflags }}" ]; then
-            ARGS+=(-DCMAKE_CXX_FLAGS="${{ matrix.cxxflags }}")
-          fi
-
-          if [ "${{ matrix.cross }}" = "true" ]; then
-            ARGS+=(-DCMAKE_SYSTEM_NAME=Linux -DCMAKE_SYSTEM_PROCESSOR=${{ matrix.cross_arch }})
-          fi
-
-          cmake -S bootstrap -B bootstrap/build "${ARGS[@]}"
-
       - name: Build
-        run: cmake --build bootstrap/build --verbose
+        run: |
+          MAKE_ARGS=(CXX="${{ matrix.cxx }}")
+          if [ -n "${{ matrix.cxxflags }}" ]; then
+            MAKE_ARGS+=(CXXFLAGS="${{ matrix.cxxflags }}")
+          fi
+          if [ "${{ matrix.cross }}" = "true" ]; then
+            MAKE_ARGS+=(ARCH="${{ matrix.cross_arch }}")
+          fi
+          make "${MAKE_ARGS[@]}"
 
       - name: Run tests
         if: matrix.run_smoke == 'true'
-        run: ctest --test-dir bootstrap/build --output-on-failure
+        run: make test
 
       - name: Smoke test
         if: matrix.run_smoke == 'true'
         run: |
-          ./bootstrap/build/traceyc bootstrap/index.trc
-          ./bootstrap/build/traceyc --version
-          ./bootstrap/build/traceyc --help
+          ./build/traceyc bootstrap/index.trc
+          ./build/traceyc --version
+          ./build/traceyc --help

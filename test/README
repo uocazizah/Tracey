@@ -1,3 +1,8 @@
-test
+Lexer test suite
 
-testing compiler before publish
+Tests are built together with the compiler (see Makefile) using the
+vendored doctest framework in ../dependencies/doctest. After building, run:
+
+    ctest --test-dir <build-dir> --output-on-failure
+
+The lexer specification these tests encode lives in ../docs/lexer.md.

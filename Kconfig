@@ -1,0 +1,81 @@
+mainmenu "Tracey Compiler Configuration"
+
+menu "Build options"
+
+config TRACEY_DEBUG_TRACE
+    bool "Enable runtime debug tracing"
+    default n
+    help
+      Print verbose tracing information at runtime.
+
+config TRACEY_MAX_SOURCE_SIZE
+    int "Maximum source file size (bytes)"
+    range 4096 1048576
+    default 65536
+    help
+      Maximum accepted source size, in bytes.
+
+config TRACEY_STACK_SIZE
+    int "Internal stack size"
+    range 256 65536
+    default 4096
+
+config TRACEY_MAX_LEXER_ERRORS
+    int "Maximum lexer errors reported per file"
+    range 1 100
+    default 10
+    help
+      Upper bound on lexer diagnostics printed for a single source file
+      before scanning stops.
+
+choice TRACEY_DEFAULT_TARGET
+    prompt "Default target architecture"
+    default TRACEY_DEFAULT_TARGET_NATIVE
+
+config TRACEY_DEFAULT_TARGET_NATIVE
+    bool "native"
+
+config TRACEY_DEFAULT_TARGET_I686
+    bool "i686 (32-bit)"
+
+config TRACEY_DEFAULT_TARGET_X86_64
+    bool "x86_64 (64-bit)"
+endchoice
+
+endmenu
+
+menu "Optional features"
+
+config TRACEY_USE_ZLIB
+    bool "Enable zlib support"
+    default n
+
+config TRACEY_USE_THREADS
+    bool "Enable multi-threading"
+    default y
+
+endmenu
+
+menu "Compiler modules"
+
+config TRACEY_MODULE_PARSER
+    bool "Enable parser module"
+    default y
+
+config TRACEY_MODULE_SEMANTIC
+    bool "Enable semantic analysis module"
+    default y
+
+config TRACEY_MODULE_CODEGEN
+    bool "Enable code generation module"
+    default y
+
+config TRACEY_MODULE_ASSEMBLER
+    bool "Enable internal assembler"
+    default y
+
+config TRACEY_MODULE_LINKER
+    bool "Enable internal linker"
+    default y
+
+endmenu

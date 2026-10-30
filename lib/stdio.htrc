@@ -1,0 +1,3 @@
+// Standard I/O header for Tracey
+void print(...);
+int printf(char* fmt, ...);
