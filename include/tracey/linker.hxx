@@ -4,9 +4,10 @@
 #include <string>
 #include <vector>
 
-namespace tracey {
+namespace tracey
+{
 
-bool link_elf_aarch64(const std::vector<std::string>& objects, const std::string& output);
+bool link_elf_aarch64(const std::vector<std::string> &objects, const std::string &output);
 
 } // namespace tracey
 
