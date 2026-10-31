@@ -5,12 +5,24 @@
 #include <string>
 #include <vector>
 
-namespace tracey {
+namespace tracey
+{
 
-struct asm_reloc { std::size_t offset; std::string symbol; int type; };
-struct asm_symbol { std::string name; std::size_t offset; bool global; };
+struct asm_reloc
+{
+    std::size_t offset;
+    std::string symbol;
+    int type;
+};
+struct asm_symbol
+{
+    std::string name;
+    std::size_t offset;
+    bool global;
+};
 
-struct asm_result {
+struct asm_result
+{
     std::vector<std::uint8_t> text;
     std::vector<std::uint8_t> debug_line;
     std::vector<std::uint8_t> debug_info;
@@ -21,9 +33,9 @@ struct asm_result {
     bool ok{false};
 };
 
-asm_result assemble_aarch64(const std::string& source);
+asm_result assemble_aarch64(const std::string &source);
 
-bool write_elf_object(const std::string& path, const asm_result& r);
+bool write_elf_object(const std::string &path, const asm_result &r);
 
 } // namespace tracey
 
