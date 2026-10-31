@@ -24,24 +24,23 @@ frequently until the first public release.
 
 Repository Structure
 -----------------------
-bootstrap/    Bootstrap compiler
-
-general/      Source Code
+general/      Source code
+include/      Public headers
 dependencies/ External dependencies
 docs/         Documentation
 etc/          Project configuration files
-include/      Global include file
-lib/          Standard Library
+lib/          Standard library
 runtime/      Mini runtime
-test/         Testing compiler
-bin/          Build output
+test/         Unit tests
+tools/        Internal assembler and linker drivers
+build/        Build output (generated)
 
-(This structure apply to bootstrap directory too)
+See docs/README for the documentation index.
 
 Development
 --------------
 
-Tracey is currently being developed using C++ (C++26).
+Tracey is currently being developed using C++ (C++23).
 
 Current focus:
 
@@ -52,6 +51,22 @@ Current focus:
 - Semantic analysis
 - Code generation
 
+Build
+-----
+
+```bash
+make          # build traceyc, traceyas, traceyld, tests
+make test     # run unit tests
+make clean    # remove build directory
+```
+
+See docs/build.md for full build instructions.
+
+Coding Style
+------------
+
+All C/C++ code follows AGENTS.md. See docs/maintenance.md.
+
 Contributing
 ---------------
 
@@ -59,3 +74,4 @@ Contributions, bug reports, and suggestions are welcome.
 
 As the language is still in early development, breaking changes may occur
 without notice.
+```
