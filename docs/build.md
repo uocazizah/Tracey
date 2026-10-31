@@ -9,7 +9,7 @@
 ## Make
 
 ```bash
-cd bootstrap
+cd .
 make                      # build traceyc, traceyas, traceyld, tests (silent by default)
 make V=1                  # verbose build
 make test                 # run unit tests
@@ -57,7 +57,7 @@ Build outputs:
 ## CMake
 
 ```bash
-cd bootstrap
+cd .
 cmake -S . -B build
 cmake --build build
 ctest --test-dir build
