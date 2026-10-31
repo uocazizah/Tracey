@@ -1,4 +1,4 @@
-/** doctest entry point for the bootstrap test executables.
+/* doctest entry point for the bootstrap test executables.
  *
  * Exactly one translation unit per test executable defines the doctest
  * implementation and main(); the per-module test files only include
