@@ -8,10 +8,12 @@
 #include <string>
 #include <string_view>
 
-namespace tracey {
+namespace tracey
+{
 
-/** Error codes for source::read */
-enum class source_error {
+/* Error codes for source::read */
+enum class source_error
+{
     invalid_path,
     open_failed,
     not_regular_file,
@@ -20,7 +22,7 @@ enum class source_error {
     no_memory,
 };
 
-/**
+/*
  * Owned, immutable snapshot of a source file loaded into memory.
  *
  * Technical notes:
@@ -29,9 +31,10 @@ enum class source_error {
  * - Size checks prevent overflow and excessive memory use.
  * - Portable fallback mirrors the same limits without POSIX calls.
  */
-class source {
-public:
-    /**
+class source
+{
+  public:
+    /*
      * @brief Read a source file from disk.
      *
      * @param path Path to source file.
@@ -41,39 +44,51 @@ public:
      *          std::filesystem/ifstream fallback elsewhere.
      */
     [[nodiscard]] static std::expected<source, source_error>
-    read(const std::filesystem::path& path);
+    read(const std::filesystem::path &path);
 
-    [[nodiscard]] const std::filesystem::path& path() const noexcept { return path_; }
-    [[nodiscard]] std::string_view content() const noexcept { return content_; }
-    [[nodiscard]] std::size_t size() const noexcept { return content_.size(); }
-    [[nodiscard]] bool empty() const noexcept { return content_.empty(); }
+    [[nodiscard]] const std::filesystem::path &path() const noexcept
+    {
+        return path_;
+    }
+    [[nodiscard]] std::string_view content() const noexcept
+    {
+        return content_;
+    }
+    [[nodiscard]] std::size_t size() const noexcept
+    {
+        return content_.size();
+    }
+    [[nodiscard]] bool empty() const noexcept
+    {
+        return content_.empty();
+    }
 
-    /** Print source debug info */
-    void print_debug(std::FILE* out = nullptr) const;
+    /* Print source debug info */
+    void print_debug(std::FILE *p_out = nullptr) const;
 
-private:
+  private:
     source(std::filesystem::path path, std::string content)
         : path_{std::move(path)}, content_{std::move(content)}
     {
     }
 
 #if defined(__unix__)
-    /** Hardened POSIX read path (see source.cxx for the security rationale). */
+    /* Hardened POSIX read path (see source.cxx for the security rationale). */
     [[nodiscard]] static std::expected<source, source_error>
-    read_posix(const std::filesystem::path& path);
+    read_posix(const std::filesystem::path &path);
 #endif
 
-    /** Portable std::filesystem/ifstream fallback (Windows and others). */
+    /* Portable std::filesystem/ifstream fallback (Windows and others). */
     [[nodiscard]] static std::expected<source, source_error>
-    read_portable(const std::filesystem::path& path);
+    read_portable(const std::filesystem::path &path);
 
     std::filesystem::path path_;
     std::string content_;
 };
 
-/** Human-readable message for a source error */
+/* Human-readable message for a source error */
 [[nodiscard]] std::string_view to_string(source_error e) noexcept;
 
-} /** namespace tracey */
+} // namespace tracey
 
-#endif /** TRACEY_SOURCE_HXX */
+#endif /* TRACEY_SOURCE_HXX */
