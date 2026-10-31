@@ -1,11 +1,11 @@
 # Lexer
 
 Specification and implementation notes for the bootstrap compiler's lexer
-(`bootstrap/include/tracey/lexer.hxx`, `bootstrap/general/lexer/`).
+(` include/tracey/lexer.hxx`, ` general/lexer/`).
 
 This document is the reference for what the lexer currently accepts. The
 parser and later stages must agree with it; when a rule here changes, update
-the unit tests in `bootstrap/test/test_lexer.cxx` in the same change.
+the unit tests in ` test/test_lexer.cxx` in the same change.
 
 ## Model
 
@@ -131,8 +131,8 @@ seen. The token dump is printed only with `--verbose`.
 
 ## Testing
 
-Unit tests live in `bootstrap/test/test_lexer.cxx` (doctest, vendored under
-`bootstrap/dependencies/doctest`), including a deterministic fuzz-lite case
+Unit tests live in ` test/test_lexer.cxx` (doctest, vendored under
+` dependencies/doctest`), including a deterministic fuzz-lite case
 that asserts lexeme bounds and progress on arbitrary bytes. Run:
 
 ```
