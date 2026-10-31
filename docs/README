@@ -14,6 +14,8 @@ and its experimental internal toolchain (assembler + linker).
 - `assembler.md` — internal AArch64 assembler.
 - `linker.md` — internal ELF64 AArch64 linker.
 - `usage.md` — end-to-end usage examples.
+- `testing.md` — running and adding tests.
+- `maintenance.md` — coding style, formatting, and maintenance.
 
 ## Project status
 
