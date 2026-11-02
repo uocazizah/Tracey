@@ -454,7 +454,8 @@ void code_generator::generate(const program &p, const std::string &source_name, 
                         // evaluate remaining args upfront? We'll evaluate lazily.
                         size_t argi = 1;
                         std::string seg;
-                        for (size_t i = 0; i < fmt.size(); ++i)
+                        size_t i = 0;
+                        while (i < fmt.size())
                         {
                             char c = fmt[i];
                             if (c == '%')
@@ -468,7 +469,8 @@ void code_generator::generate(const program &p, const std::string &source_name, 
                                 }
                                 if (i + 1 < fmt.size())
                                 {
-                                    char spec = fmt[++i];
+                                    char spec = fmt[i + 1];
+                                    ++i; /* consume the format specifier */
                                     if (spec == 'd')
                                     {
                                         if (argi < ce->args.size())
@@ -491,6 +493,7 @@ void code_generator::generate(const program &p, const std::string &source_name, 
                             {
                                 seg.push_back(c);
                             }
+                            ++i;
                         }
                         if (!seg.empty())
                         {
