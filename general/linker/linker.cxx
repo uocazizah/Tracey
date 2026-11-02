@@ -246,11 +246,8 @@ bool link_elf_aarch64(const std::vector<std::string> &objects, const std::string
                     sym_addr[s.name] = code_base_va + bases[i] + s.value;
                 sym_global[s.name] = true;
             }
-            if (s.defined && !s.name.empty() && s.name[0] == '.')
-            {
-            } // skip
-            // also local labels? For relocations within same object, need local symbol addresses
-            // too. Store all defined symbols per object.
+            /* Local labels (names beginning with '.') are intentionally not added here;
+             * they are resolved in the second pass below. */
         }
     }
     // For relocation, need per-object symbol addresses including locals. We'll resolve by name
