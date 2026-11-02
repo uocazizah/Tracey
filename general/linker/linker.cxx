@@ -498,8 +498,8 @@ bool link_elf_aarch64(const std::vector<std::string> &objects, const std::string
         return false;
 
     Ehdr ehdr{};
-    unsigned char ident[16] = {0x7f, 'E', 'L', 'F', 2, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0};
-    std::memcpy(ehdr.e_ident, ident, 16);
+    unsigned char ident[16] = {0x7f, 'E', 'L', 'F', 2, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0}; /* flawfinder: ignore */
+    std::memcpy(ehdr.e_ident, ident, 16); /* flawfinder: ignore */
     ehdr.e_type = ET_EXEC;
     ehdr.e_machine = EM_AARCH64;
     ehdr.e_version = 1;

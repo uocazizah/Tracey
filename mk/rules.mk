@@ -6,7 +6,7 @@
 
 all: $(CONFIG_FILE) $(TRACEYC) $(TEST_LEXER) $(BUILD_DIR)/traceyas $(BUILD_DIR)/traceyld \
      $(BUILD_DIR)/libtracey_source.so $(BUILD_DIR)/libtracey_lexer.so $(BUILD_DIR)/libtracey_argument.so \
-     $(BUILD_DIR)/libtracey_assembler.so $(BUILD_DIR)/libtracey_linker.so
+     $(BUILD_DIR)/libtracey_assembler.so $(BUILD_DIR)/libtracey_linker.so $(BUILD_DIR)/libtracey_preprocessor.so $(BUILD_DIR)/libtracey_pipeline.so $(BUILD_DIR)/libtracey_runtime.so
 
 # Bootstrap .config target (safety net; parse-time bootstrap usually creates it).
 $(CONFIG_FILE):
@@ -34,7 +34,9 @@ $(BUILD_DIR)/libtracey_lexer.a: $(patsubst %.cxx,$(OBJ_DIR)/%.o,$(LEXER_SRCS))
 $(BUILD_DIR)/libtracey_argument.a: $(patsubst %.cxx,$(OBJ_DIR)/%.o,$(ARGUMENT_SRCS))
 	$(Q)ar rcs $@ $^
 
-$(OBJ_DIR)/index.o: index.cxx $(GENERATED_HEADERS)
+$(OBJ_DIR)/tools/traceyc/main.o: tools/traceyc/main.cxx $(GENERATED_HEADERS)
+	@mkdir -p $(dir $@)
+	$(Q)$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $< -o $@
 	@mkdir -p $(dir $@)
 	$(Q)$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $< -o $@
 
@@ -43,6 +45,24 @@ $(BUILD_DIR)/libtracey_assembler.a: $(patsubst %.cxx,$(OBJ_DIR)/%.o,$(ASSEMBLER_
 
 $(BUILD_DIR)/libtracey_linker.a: $(patsubst %.cxx,$(OBJ_DIR)/%.o,$(LINKER_SRCS)) $(patsubst %.cxx,$(OBJ_DIR)/%.o,$(ELF_SRCS))
 	$(Q)ar rcs $@ $^
+
+$(BUILD_DIR)/libtracey_pipeline.a: $(patsubst %.cxx,$(OBJ_DIR)/%.o,$(PIPELINE_SRCS))
+	$(Q)ar rcs $@ $^
+
+$(BUILD_DIR)/libtracey_pipeline.so: $(BUILD_DIR)/libtracey_pipeline.a
+	$(Q)$(CXX) -shared -o $@ -Wl,--whole-archive $^ -Wl,--no-whole-archive
+
+$(BUILD_DIR)/libtracey_runtime.a: $(patsubst %.cxx,$(OBJ_DIR)/%.o,$(RUNTIME_SRCS))
+	$(Q)ar rcs $@ $^
+
+$(BUILD_DIR)/libtracey_runtime.so: $(BUILD_DIR)/libtracey_runtime.a
+	$(Q)$(CXX) -shared -o $@ -Wl,--whole-archive $^ -Wl,--no-whole-archive
+
+$(BUILD_DIR)/libtracey_preprocessor.a: $(patsubst %.cxx,$(OBJ_DIR)/%.o,$(PREPROCESSOR_SRCS))
+	$(Q)ar rcs $@ $^
+
+$(BUILD_DIR)/libtracey_preprocessor.so: $(BUILD_DIR)/libtracey_preprocessor.a
+	$(Q)$(CXX) -shared -o $@ -Wl,--whole-archive $^ -Wl,--no-whole-archive
 
 $(BUILD_DIR)/libtracey_source.so: $(patsubst %.cxx,$(OBJ_DIR)/%.o,$(SOURCE_SRCS))
 	$(Q)$(CXX) -shared -o $@ $^
@@ -65,8 +85,8 @@ $(BUILD_DIR)/traceyas: tools/tracey-as.cxx $(BUILD_DIR)/libtracey_assembler.a
 $(BUILD_DIR)/traceyld: tools/tracey-ld.cxx $(BUILD_DIR)/libtracey_linker.a
 	$(Q)$(CXX) $(CPPFLAGS) $(CXXFLAGS) tools/tracey-ld.cxx -L$(BUILD_DIR) -ltracey_linker -Wl,-rpath,'$$ORIGIN' -Wl,-rpath,'$(LIBDIR)' -o $@
 
-$(TRACEYC): $(OBJ_DIR)/index.o $(BUILD_DIR)/libtracey_source.a $(BUILD_DIR)/libtracey_lexer.a $(BUILD_DIR)/libtracey_argument.a $(BUILD_DIR)/libtracey_assembler.a $(BUILD_DIR)/libtracey_linker.a $(OBJ_DIR)/general/parser/parser.o $(OBJ_DIR)/general/parser/parser_debug.o $(OBJ_DIR)/general/semantic/semantic.o $(OBJ_DIR)/general/codegen/codegen.o $(OBJ_DIR)/general/diagnostics/diagnostics.o
-	$(Q)$(CXX) $(LDFLAGS) $(OBJ_DIR)/index.o $(OBJ_DIR)/general/parser/parser.o $(OBJ_DIR)/general/parser/parser_debug.o $(OBJ_DIR)/general/semantic/semantic.o $(OBJ_DIR)/general/codegen/codegen.o $(OBJ_DIR)/general/diagnostics/diagnostics.o -L$(BUILD_DIR) -ltracey_source -ltracey_lexer -ltracey_argument -ltracey_assembler -ltracey_linker $(LDLIBS) -Wl,-rpath,'$$ORIGIN' -Wl,-rpath,'$(LIBDIR)' -o $@
+$(TRACEYC): $(OBJ_DIR)/tools/traceyc/main.o $(BUILD_DIR)/libtracey_source.a $(BUILD_DIR)/libtracey_lexer.a $(BUILD_DIR)/libtracey_argument.a $(BUILD_DIR)/libtracey_assembler.a $(BUILD_DIR)/libtracey_linker.a $(BUILD_DIR)/libtracey_preprocessor.a $(BUILD_DIR)/libtracey_pipeline.a $(BUILD_DIR)/libtracey_runtime.a $(OBJ_DIR)/general/parser/parser.o $(OBJ_DIR)/general/parser/parser_debug.o $(OBJ_DIR)/general/semantic/semantic.o $(OBJ_DIR)/general/codegen/codegen.o $(OBJ_DIR)/general/diagnostics/diagnostics.o
+	$(Q)$(CXX) $(LDFLAGS) $(OBJ_DIR)/tools/traceyc/main.o $(OBJ_DIR)/general/parser/parser.o $(OBJ_DIR)/general/parser/parser_debug.o $(OBJ_DIR)/general/semantic/semantic.o $(OBJ_DIR)/general/codegen/codegen.o $(OBJ_DIR)/general/diagnostics/diagnostics.o -L$(BUILD_DIR) -ltracey_source -ltracey_argument -ltracey_assembler -ltracey_linker -ltracey_pipeline -ltracey_preprocessor -ltracey_lexer -ltracey_runtime $(LDLIBS) -Wl,-rpath,'$$ORIGIN' -Wl,-rpath,'$(LIBDIR)' -o $@
 
 $(OBJ_DIR)/doctest_main.o: test/doctest_main.cxx $(GENERATED_HEADERS)
 	@mkdir -p $(dir $@)

@@ -97,7 +97,7 @@ bool parser::parse(program &out)
     {
         if (current_.type == token_type::error_)
         {
-            error("unexpected lexer error", current_);
+            error("Unexpected lexer error", current_);
             advance();
             continue;
         }
@@ -165,7 +165,7 @@ type_kind parser::parse_type()
         }
         return type_kind::char_;
     }
-    error("expected type", current_);
+    error("Expected type", current_);
     return type_kind::int_;
 }
 
@@ -178,7 +178,7 @@ bool parser::parse_function(program &p)
     }
     if (!check(token_type::identifier))
     {
-        error("expected function name", current_);
+        error("Expected function name", current_);
         return false;
     }
     std::string name(current_.lexeme);
@@ -206,13 +206,13 @@ bool parser::parse_function(program &p)
             {
                 if (!params.empty() || variadic)
                 {
-                    error("void parameter must be the only parameter", current_);
+                    error("Void parameter must be the only parameter", current_);
                 }
                 break;
             }
             if (!check(token_type::identifier))
             {
-                error("expected parameter name", current_);
+                error("Expected parameter name", current_);
                 break;
             }
             std::string pname(current_.lexeme);
@@ -287,7 +287,7 @@ std::unique_ptr<stmt> parser::parse_statement()
         type_kind t = parse_type();
         if (!check(token_type::identifier))
         {
-            error("expected variable name", current_);
+            error("Expected variable name", current_);
             synchronize();
             return nullptr;
         }
@@ -720,7 +720,7 @@ std::unique_ptr<expr> parser::parse_primary()
             return nullptr;
         return e;
     }
-    error("expected expression", current_);
+    error("Expected expression", current_);
     return nullptr;
 }
 

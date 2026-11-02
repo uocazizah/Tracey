@@ -52,3 +52,20 @@ gcc test.s -o test
 ```bash
 ./build/traceyc -v test.trc
 ```
+
+## Standard I/O
+
+Output:
+
+```trc
+print(...);                 // variadic; int/char use print_int, char*/strings use print_str
+```
+
+Input (stdin only):
+
+```trc
+int x = input_int();        // returns 0 on EOF/error
+char buf[32];
+input_str(buf, 32);        // reads a line, null-terminates, returns count
+print(buf);
+```

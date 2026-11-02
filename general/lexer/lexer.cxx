@@ -635,17 +635,17 @@ std::string_view to_string(token_error error) noexcept
         case token_error::none:
             return "NONE";
         case token_error::invalid_character:
-            return "INVALID_CHARACTER";
+            return "Invalid character in source";
         case token_error::invalid_number_suffix:
-            return "INVALID_NUMBER_SUFFIX";
+            return "Invalid numeric literal suffix";
         case token_error::invalid_escape:
-            return "INVALID_ESCAPE";
+            return "Invalid escape sequence in string literal";
         case token_error::unterminated_string:
-            return "UNTERMINATED_STRING";
+            return "Unterminated string literal";
         case token_error::unterminated_comment:
-            return "UNTERMINATED_COMMENT";
+            return "Unterminated block comment";
         default:
-            return "UNKNOWN";
+            return "Unknown lexer error";
     }
 #if defined(__clang__)
 #pragma clang diagnostic pop

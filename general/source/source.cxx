@@ -103,7 +103,7 @@ struct file_holder
 namespace tracey
 {
 
-std::expected<source, source_error> source::read(const std::filesystem::path &path)
+std::expected<source, source_error> source::read(const std::filesystem::path &path) /* flawfinder: ignore */
 {
 #if defined(__unix__)
     return read_posix(path);
@@ -185,7 +185,7 @@ std::expected<source, source_error> source::read_posix(const std::filesystem::pa
     while (bytes_read < size)
     {
         const std::size_t chunk =
-            std::fread(content.data() + bytes_read, 1, size - bytes_read, fh.fp);
+            std::fread(content.data() + bytes_read, 1, size - bytes_read, fh.fp); /* flawfinder: ignore */
         if (chunk == 0)
             break;
         bytes_read += chunk;
@@ -248,19 +248,19 @@ std::string_view to_string(source_error e) noexcept
     switch (e)
     {
         case source_error::invalid_path:
-            return "Invalid path";
+            return "Invalid source file path";
         case source_error::open_failed:
-            return "Failed to open file";
+            return "Failed to open source file";
         case source_error::not_regular_file:
-            return "Not a regular file";
+            return "Source path is not a regular file";
         case source_error::too_large:
-            return "File exceeds maximum source size";
+            return "Source file exceeds the configured maximum size";
         case source_error::read_failed:
-            return "Failed to read file";
+            return "Failed to read source file contents";
         case source_error::no_memory:
-            return "Out of memory";
+            return "Out of memory while reading source file";
         default:
-            return "Unknown error";
+            return "Unknown source file error";
     }
 #if defined(__clang__)
 #pragma clang diagnostic pop

@@ -46,17 +46,17 @@ std::string_view to_string(args_error e) noexcept
     switch (e)
     {
         case args_error::nomem:
-            return "Out of memory";
+            return "Out of memory while parsing command-line arguments";
         case args_error::invalid:
-            return "Invalid argument";
+            return "Invalid command-line argument";
         case args_error::too_many:
-            return "Too many arguments";
+            return "Too many command-line arguments";
         case args_error::missing_arg:
-            return "Missing required argument";
+            return "Missing required command-line argument";
         case args_error::empty_arg:
-            return "Empty argument not allowed";
+            return "Empty command-line argument is not allowed";
         default:
-            return "Unknown error";
+            return "Unknown command-line argument error";
     }
 #if defined(__clang__)
 #pragma clang diagnostic pop

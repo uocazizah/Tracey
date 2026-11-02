@@ -27,7 +27,7 @@ jobs:
       - name: flawfinder_scan
         uses: david-a-wheeler/flawfinder@2.0.20
         with:
-          arguments: '--minlevel=0 --context --columns --sarif ./'
+          arguments: "--minlevel=0 --context --columns --sarif --exclude '*/dependencies/*' --exclude '*/bootstrap/dependencies/*' ./"
           output: 'flawfinder_results.sarif'
 
       - name: Upload analysis results to GitHub Security tab

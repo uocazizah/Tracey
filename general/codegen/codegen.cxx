@@ -1,5 +1,7 @@
 #include <tracey/codegen.hxx>
 
+#include <tracey/runtime.hxx>
+
 #include <functional>
 
 #include <bit>
@@ -252,7 +254,15 @@ void code_generator::generate(const program &p, const std::string &source_name, 
             }
             if (auto *ie = dynamic_cast<int_expr *>(p_e))
             {
-                emit("mov x0, #" + std::to_string(ie->value));
+                /* Load an arbitrary 64-bit integer immediate. AArch64
+                 * "mov x0, #imm" only accepts a 16-bit immediate, so use
+                 * movz/movk to construct the full value (including negative
+                 * numbers, whose two's-complement bit pattern is loaded). */
+                std::uint64_t bits = static_cast<std::uint64_t>(ie->value);
+                emit("mov x0, #" + std::to_string(bits & 0xFFFFU));
+                emit("movk x0, #" + std::to_string((bits >> 16) & 0xFFFFU) + ", lsl #16");
+                emit("movk x0, #" + std::to_string((bits >> 32) & 0xFFFFU) + ", lsl #32");
+                emit("movk x0, #" + std::to_string((bits >> 48) & 0xFFFFU) + ", lsl #48");
                 return;
             }
             if (auto *be = dynamic_cast<bool_expr *>(p_e))
@@ -303,6 +313,10 @@ void code_generator::generate(const program &p, const std::string &source_name, 
             }
             if (auto *ix = dynamic_cast<index_expr *>(p_e))
             {
+                type_kind bt = infer_type(ix->base.get());
+                int stride = 8;
+                if (bt == type_kind::char_ptr)
+                    stride = 1;
                 gen_expr(ix->base.get());
                 emit("sub sp, sp, #16");
                 emit("str x0, [sp]");
@@ -310,10 +324,16 @@ void code_generator::generate(const program &p, const std::string &source_name, 
                 emit("mov x1, x0");
                 emit("ldr x0, [sp]");
                 emit("add sp, sp, #16");
-                emit("mov x2, #8");
+                if (stride != 1)
+                    emit("mov x2, #" + std::to_string(stride));
+                else
+                    emit("mov x2, #1");
                 emit("mul x3, x1, x2");
                 emit("add x0, x0, x3");
-                emit("ldr x0, [x0]");
+                if (bt == type_kind::char_ptr)
+                    emit("ldrb w0, [x0]");
+                else
+                    emit("ldr x0, [x0]");
                 return;
             }
             if (auto *ae = dynamic_cast<addr_expr *>(p_e))
@@ -333,8 +353,19 @@ void code_generator::generate(const program &p, const std::string &source_name, 
             }
             if (auto *de = dynamic_cast<deref_expr *>(p_e))
             {
+                type_kind pt = infer_type(de->operand.get());
                 gen_expr(de->operand.get());
-                emit("ldr x0, [x0]");
+                if (pt == type_kind::char_ptr)
+                {
+                    /* Load a single byte for char pointers. Zero-extend the
+                     * value so it can be treated as an unsigned integer by
+                     * the runtime printing helpers. */
+                    emit("ldrb w0, [x0]");
+                }
+                else
+                {
+                    emit("ldr x0, [x0]");
+                }
                 return;
             }
             if (auto *ue = dynamic_cast<unary_expr *>(p_e))
@@ -373,7 +404,15 @@ void code_generator::generate(const program &p, const std::string &source_name, 
                 {
                     if (!ce->args.empty())
                         gen_expr(ce->args[0].get());
-                    if (ce->args.size() > 0 && dynamic_cast<string_expr *>(ce->args[0].get()))
+                    bool is_string_arg = false;
+                    if (!ce->args.empty())
+                    {
+                        if (dynamic_cast<string_expr *>(ce->args[0].get()))
+                            is_string_arg = true;
+                        else if (infer_type(ce->args[0].get()) == type_kind::char_ptr)
+                            is_string_arg = true;
+                    }
+                    if (is_string_arg)
                     {
                         emit("bl __tracey_print_str");
                     }
@@ -381,6 +420,26 @@ void code_generator::generate(const program &p, const std::string &source_name, 
                     {
                         emit("bl __tracey_print_int");
                     }
+                    return;
+                }
+                if (ce->callee == "input_int")
+                {
+                    emit("bl __tracey_input_int");
+                    return;
+                }
+                if (ce->callee == "input_str")
+                {
+                    if (ce->args.size() >= 2)
+                    {
+                        gen_expr(ce->args[0].get());
+                        emit("sub sp, sp, #16");
+                        emit("str x0, [sp]");
+                        gen_expr(ce->args[1].get());
+                        emit("mov x1, x0");
+                        emit("ldr x0, [sp]");
+                        emit("add sp, sp, #16");
+                    }
+                    emit("bl __tracey_input_str");
                     return;
                 }
                 if (ce->callee == "printf")
@@ -778,60 +837,7 @@ void code_generator::generate(const program &p, const std::string &source_name, 
 
     if (emit_runtime_helpers)
     {
-        // Runtime helpers
-        out << "    .globl __tracey_print_int\n";
-        out << "__tracey_print_int:\n";
-        out << "    sub sp, sp, #32\n";
-        out << "    mov x1, #0\n";
-        out << "    cmp x0, #0\n";
-        out << "    b.ge Lpi_pos\n";
-        out << "    neg x0, x0\n";
-        out << "    mov x1, #1\n";
-        out << "Lpi_pos:\n";
-        out << "    add x2, sp, #31\n";
-        out << "    mov w3, #0\n";
-        out << "    strb w3, [x2]\n";
-        out << "    mov x4, #0\n";
-        out << "Lpi_loop:\n";
-        out << "    mov x5, #10\n";
-        out << "    udiv x6, x0, x5\n";
-        out << "    msub x7, x6, x5, x0\n";
-        out << "    add w7, w7, #48\n";
-        out << "    sub x2, x2, #1\n";
-        out << "    strb w7, [x2]\n";
-        out << "    add x4, x4, #1\n";
-        out << "    mov x0, x6\n";
-        out << "    cbnz x0, Lpi_loop\n";
-        out << "    cbz x1, Lpi_nosign\n";
-        out << "    sub x2, x2, #1\n";
-        out << "    mov w3, #45\n";
-        out << "    strb w3, [x2]\n";
-        out << "    add x4, x4, #1\n";
-        out << "Lpi_nosign:\n";
-        out << "    mov x8, #64\n";
-        out << "    mov x0, #1\n";
-        out << "    mov x1, x2\n";
-        out << "    mov x2, x4\n";
-        out << "    svc #0\n";
-        out << "    add sp, sp, #32\n";
-        out << "    ret\n";
-
-        out << "    .globl __tracey_print_str\n";
-        out << "__tracey_print_str:\n";
-        out << "    mov x1, x0\n";
-        out << "    mov x2, x0\n";
-        out << "Lps_len:\n";
-        out << "    ldrb w3, [x1]\n";
-        out << "    cbz w3, Lps_done\n";
-        out << "    add x1, x1, #1\n";
-        out << "    b Lps_len\n";
-        out << "Lps_done:\n";
-        out << "    sub x2, x1, x2\n";
-        out << "    mov x1, x0\n";
-        out << "    mov x8, #64\n";
-        out << "    mov x0, #1\n";
-        out << "    svc #0\n";
-        out << "    ret\n";
+        tracey::emit_runtime_helpers(out, arch_);
     }
 
     // String table

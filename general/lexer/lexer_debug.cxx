@@ -69,6 +69,7 @@ void token::print_debug(std::FILE *p_out) const
     if (type == token_type::error_)
     {
         std::print(p_out, "  Error: {}\n", to_string(error));
+        std::print(p_out, "  \033[1;34mnote:\033[0m inspect the reported token and source location\n");
     }
     std::print(p_out, "  Line: {}\n", line);
     std::print(p_out, "  Column: {}\n", column);

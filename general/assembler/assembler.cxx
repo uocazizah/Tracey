@@ -456,7 +456,7 @@ asm_result assemble_aarch64(const std::string &source)
                 off += 4;
                 continue;
             }
-            res.error = "bad fmov";
+            res.error = "Invalid floating-point move instruction";
             res.ok = false;
             return res;
         }
@@ -625,7 +625,7 @@ asm_result assemble_aarch64(const std::string &source)
             }
             else
             {
-                res.error = "bad mov";
+                res.error = "Invalid move instruction";
                 res.ok = false;
                 return res;
             }
@@ -673,7 +673,7 @@ asm_result assemble_aarch64(const std::string &source)
             }
             else
             {
-                res.error = "bad add/sub";
+                res.error = "Invalid add/subtract instruction";
                 return res;
             }
             off += 4;
@@ -901,7 +901,7 @@ asm_result assemble_aarch64(const std::string &source)
             int cc = condcode(condstr);
             if (cc < 0)
             {
-                res.error = "bad condition";
+                res.error = "Invalid branch condition";
                 return res;
             }
             std::string target = trim(operands);
@@ -1269,7 +1269,7 @@ asm_result assemble_aarch64(const std::string &source)
             auto it = label_off.find(target);
             if (it == label_off.end())
             {
-                res.error = "undefined label: " + target;
+                res.error = "Undefined assembler label: " + target;
                 res.ok = false;
                 return res;
             }
@@ -1290,7 +1290,7 @@ asm_result assemble_aarch64(const std::string &source)
             continue;
         }
 
-        res.error = "unknown instruction: " + mnemonic;
+        res.error = "Unknown assembler instruction: " + mnemonic;
         res.ok = false;
         return res;
     }
@@ -1656,8 +1656,8 @@ bool write_elf_object(const std::string &path, const asm_result &r)
     // Layout
     // ELF header
     Ehdr ehdr{};
-    unsigned char ident[16] = {0x7f, 'E', 'L', 'F', 2, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0};
-    std::memcpy(ehdr.e_ident, ident, 16);
+    unsigned char ident[16] = {0x7f, 'E', 'L', 'F', 2, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0}; /* flawfinder: ignore */
+    std::memcpy(ehdr.e_ident, ident, 16); /* flawfinder: ignore */
     ehdr.e_type = ET_REL;
     ehdr.e_machine = EM_AARCH64;
     ehdr.e_version = 1;

@@ -40,7 +40,7 @@ bool semantic_analyzer::declare(const std::string &name, symbol sym, const sourc
             {
                 return true; // compatible redeclaration
             }
-            error("redeclaration of '" + name + "'", loc);
+            error("Redeclaration of '" + name + "'", loc);
             return false;
         }
     }
@@ -92,7 +92,7 @@ type_kind semantic_analyzer::check_expr(expr *p_e, const function_decl *p_fn)
         type_kind bt = check_expr(ie->base.get(), p_fn);
         type_kind it = check_expr(ie->index.get(), p_fn);
         if (it != type_kind::int_)
-            error("array index must be int", ie->loc);
+            error("Array index must be int", ie->loc);
         if (bt == type_kind::int_ptr)
             return type_kind::int_;
         if (bt == type_kind::char_ptr)
@@ -101,7 +101,7 @@ type_kind semantic_analyzer::check_expr(expr *p_e, const function_decl *p_fn)
             return type_kind::float_;
         if (bt == type_kind::double_ptr)
             return type_kind::double_;
-        error("subscript requires array or pointer", ie->loc);
+        error("Subscript requires array or pointer", ie->loc);
         return type_kind::int_;
     }
     if (auto *ae = dynamic_cast<addr_expr *>(p_e))
@@ -115,7 +115,7 @@ type_kind semantic_analyzer::check_expr(expr *p_e, const function_decl *p_fn)
             return type_kind::float_ptr;
         if (t == type_kind::double_)
             return type_kind::double_ptr;
-        error("cannot take address", ae->loc);
+        error("Cannot take address", ae->loc);
         return type_kind::int_ptr;
     }
     if (auto *de = dynamic_cast<deref_expr *>(p_e))
@@ -129,7 +129,7 @@ type_kind semantic_analyzer::check_expr(expr *p_e, const function_decl *p_fn)
             return type_kind::float_;
         if (t == type_kind::double_ptr)
             return type_kind::double_;
-        error("cannot dereference non-pointer", de->loc);
+        error("Cannot dereference non-pointer", de->loc);
         return type_kind::int_;
     }
     if (auto *id = dynamic_cast<ident_expr *>(p_e))
@@ -137,7 +137,7 @@ type_kind semantic_analyzer::check_expr(expr *p_e, const function_decl *p_fn)
         symbol s;
         if (!lookup(id->name, s))
         {
-            error("undefined identifier '" + id->name + "'", id->loc);
+            error("Undefined identifier '" + id->name + "'", id->loc);
             return type_kind::int_;
         }
         if (s.is_function)
@@ -158,7 +158,7 @@ type_kind semantic_analyzer::check_expr(expr *p_e, const function_decl *p_fn)
                 return type_kind::float_;
             if (t == type_kind::double_)
                 return type_kind::double_;
-            error("unary '-' requires numeric", ue->loc);
+            error("Unary '-' requires numeric", ue->loc);
             return type_kind::int_;
         }
         if (t != type_kind::bool_)
@@ -174,13 +174,13 @@ type_kind semantic_analyzer::check_expr(expr *p_e, const function_decl *p_fn)
                 symbol s;
                 if (!lookup(id->name, s) || s.is_function)
                 {
-                    error("undefined variable '" + id->name + "'", be->loc);
+                    error("Undefined variable '" + id->name + "'", be->loc);
                     (void)check_expr(be->right.get(), p_fn);
                     return type_kind::int_;
                 }
                 type_kind rt = check_expr(be->right.get(), p_fn);
                 if (rt != s.type)
-                    error("type mismatch in assignment", be->loc);
+                    error("Type mismatch in assignment", be->loc);
                 return s.type;
             }
             if (auto *ix = dynamic_cast<index_expr *>(be->left.get()))
@@ -188,7 +188,7 @@ type_kind semantic_analyzer::check_expr(expr *p_e, const function_decl *p_fn)
                 type_kind bt = check_expr(ix->base.get(), p_fn);
                 type_kind it = check_expr(ix->index.get(), p_fn);
                 if (it != type_kind::int_)
-                    error("array index must be int", ix->loc);
+                    error("Array index must be int", ix->loc);
                 type_kind elem = type_kind::int_;
                 if (bt == type_kind::char_ptr)
                     elem = type_kind::char_;
@@ -197,10 +197,10 @@ type_kind semantic_analyzer::check_expr(expr *p_e, const function_decl *p_fn)
                 else if (bt == type_kind::double_ptr)
                     elem = type_kind::double_;
                 else if (bt != type_kind::int_ptr)
-                    error("subscript requires array or pointer", ix->loc);
+                    error("Subscript requires array or pointer", ix->loc);
                 type_kind rt = check_expr(be->right.get(), p_fn);
                 if (rt != elem)
-                    error("type mismatch in assignment", be->loc);
+                    error("Type mismatch in assignment", be->loc);
                 return elem;
             }
             if (auto *de = dynamic_cast<deref_expr *>(be->left.get()))
@@ -214,13 +214,13 @@ type_kind semantic_analyzer::check_expr(expr *p_e, const function_decl *p_fn)
                 else if (pt == type_kind::double_ptr)
                     elem = type_kind::double_;
                 else if (pt != type_kind::int_ptr)
-                    error("cannot dereference non-pointer", de->loc);
+                    error("Cannot dereference non-pointer", de->loc);
                 type_kind rt = check_expr(be->right.get(), p_fn);
                 if (rt != elem)
-                    error("type mismatch in assignment", de->loc);
+                    error("Type mismatch in assignment", de->loc);
                 return elem;
             }
-            error("invalid assignment target", be->loc);
+            error("Invalid assignment target", be->loc);
             (void)check_expr(be->right.get(), p_fn);
             return type_kind::int_;
         }
@@ -241,7 +241,7 @@ type_kind semantic_analyzer::check_expr(expr *p_e, const function_decl *p_fn)
                     {
                         return type_kind::double_;
                     }
-                    error("arithmetic requires numeric operands", be->loc);
+                    error("Arithmetic requires numeric operands", be->loc);
                     return type_kind::double_;
                 }
                 if (lt == type_kind::float_ || rt == type_kind::float_)
@@ -251,20 +251,20 @@ type_kind semantic_analyzer::check_expr(expr *p_e, const function_decl *p_fn)
                     {
                         return type_kind::float_;
                     }
-                    error("arithmetic requires numeric operands", be->loc);
+                    error("Arithmetic requires numeric operands", be->loc);
                     return type_kind::float_;
                 }
                 if (lt != type_kind::int_ || rt != type_kind::int_)
-                    error("arithmetic requires int operands", be->loc);
+                    error("Arithmetic requires int operands", be->loc);
                 return type_kind::int_;
             case binary_op::mod:
                 if (lt != type_kind::int_ || rt != type_kind::int_)
-                    error("modulo requires int operands", be->loc);
+                    error("Modulo requires int operands", be->loc);
                 return type_kind::int_;
             case binary_op::eq:
             case binary_op::ne:
                 if (lt != rt)
-                    error("comparison requires same types", be->loc);
+                    error("Comparison requires same types", be->loc);
                 return type_kind::bool_;
             case binary_op::lt:
             case binary_op::gt:
@@ -276,12 +276,12 @@ type_kind semantic_analyzer::check_expr(expr *p_e, const function_decl *p_fn)
                 {
                     return type_kind::bool_;
                 }
-                error("relational requires numeric operands", be->loc);
+                error("Relational requires numeric operands", be->loc);
                 return type_kind::bool_;
             case binary_op::log_and:
             case binary_op::log_or:
                 if (lt != type_kind::bool_ || rt != type_kind::bool_)
-                    error("logical requires bool operands", be->loc);
+                    error("Logical requires bool operands", be->loc);
                 return type_kind::bool_;
             default:
                 return type_kind::int_;
@@ -295,6 +295,32 @@ type_kind semantic_analyzer::check_expr(expr *p_e, const function_decl *p_fn)
                 check_expr(a.get(), p_fn);
             return type_kind::void_;
         }
+        if (ce->callee == "input_int")
+        {
+            if (!ce->args.empty())
+                error("Wrong number of arguments to 'input_int'", ce->loc);
+            for (auto &a : ce->args)
+                check_expr(a.get(), p_fn);
+            return type_kind::int_;
+        }
+        if (ce->callee == "input_str")
+        {
+            if (ce->args.size() != 2)
+                error("Wrong number of arguments to 'input_str'", ce->loc);
+            if (ce->args.size() >= 1)
+            {
+                type_kind t = check_expr(ce->args[0].get(), p_fn);
+                if (t != type_kind::char_ptr)
+                    error("Input_str requires char* buffer", ce->args[0]->loc);
+            }
+            if (ce->args.size() >= 2)
+            {
+                type_kind t = check_expr(ce->args[1].get(), p_fn);
+                if (t != type_kind::int_)
+                    error("Input_str size must be int", ce->args[1]->loc);
+            }
+            return type_kind::int_;
+        }
         if (ce->callee == "printf")
         {
             for (auto &a : ce->args)
@@ -304,13 +330,13 @@ type_kind semantic_analyzer::check_expr(expr *p_e, const function_decl *p_fn)
         symbol s;
         if (!lookup(ce->callee, s) || !s.is_function)
         {
-            error("undefined function '" + ce->callee + "'", ce->loc);
+            error("Undefined function '" + ce->callee + "'", ce->loc);
             for (auto &a : ce->args)
                 check_expr(a.get(), p_fn);
             return type_kind::int_;
         }
         if ((int)ce->args.size() != s.arity)
-            error("wrong number of arguments to '" + ce->callee + "'", ce->loc);
+            error("Wrong number of arguments to '" + ce->callee + "'", ce->loc);
         for (auto &a : ce->args)
             check_expr(a.get(), p_fn);
         return s.type;
@@ -335,7 +361,7 @@ void semantic_analyzer::check_stmt(stmt *p_s, const function_decl *p_fn, type_ki
         type_kind vt = vd->type;
         if (vt == type_kind::void_)
         {
-            error("variable cannot have type void", vd->loc);
+            error("Variable cannot have type void", vd->loc);
             return;
         }
         if (vd->array_size > 0)
@@ -356,7 +382,7 @@ void semantic_analyzer::check_stmt(stmt *p_s, const function_decl *p_fn, type_ki
         {
             type_kind t = check_expr(vd->init.get(), p_fn);
             if (t != vt)
-                error("type mismatch in initializer", vd->loc);
+                error("Type mismatch in initializer", vd->loc);
         }
         return;
     }
@@ -369,7 +395,7 @@ void semantic_analyzer::check_stmt(stmt *p_s, const function_decl *p_fn, type_ki
     {
         type_kind t = check_expr(is->condition.get(), p_fn);
         if (t != type_kind::bool_)
-            error("if condition must be bool", is->loc);
+            error("If condition must be bool", is->loc);
         check_stmt(is->then_branch.get(), p_fn, expected_return);
         if (is->else_branch)
             check_stmt(is->else_branch.get(), p_fn, expected_return);
@@ -379,7 +405,7 @@ void semantic_analyzer::check_stmt(stmt *p_s, const function_decl *p_fn, type_ki
     {
         type_kind t = check_expr(ws->condition.get(), p_fn);
         if (t != type_kind::bool_)
-            error("while condition must be bool", ws->loc);
+            error("While condition must be bool", ws->loc);
         check_stmt(ws->body.get(), p_fn, expected_return);
         return;
     }
@@ -389,12 +415,12 @@ void semantic_analyzer::check_stmt(stmt *p_s, const function_decl *p_fn, type_ki
         {
             type_kind t = check_expr(rs->value.get(), p_fn);
             if (t != expected_return)
-                error("return type mismatch", rs->loc);
+                error("Return type mismatch", rs->loc);
         }
         else
         {
             if (expected_return != type_kind::void_)
-                error("expected return value", rs->loc);
+                error("Expected return value", rs->loc);
         }
         return;
     }
@@ -406,7 +432,7 @@ void semantic_analyzer::check_function(function_decl *p_f)
     for (auto &[t, name] : p_f->params)
     {
         if (t == type_kind::void_)
-            error("parameter cannot have type void", p_f->loc);
+            error("Parameter cannot have type void", p_f->loc);
         declare(name, symbol{t, false, 0}, p_f->loc);
     }
     if (p_f->body)
