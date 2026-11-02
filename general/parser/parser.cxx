@@ -173,9 +173,6 @@ bool parser::parse_function(program &p)
 {
     source_loc loc{current_.line, current_.column};
     type_kind rt = parse_type();
-    if (had_error_ && !check(token_type::identifier))
-    { /* continue */
-    }
     if (!check(token_type::identifier))
     {
         error("Expected function name", current_);
