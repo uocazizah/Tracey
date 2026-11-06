@@ -495,8 +495,17 @@ bool link_elf_aarch64(const std::vector<std::string> &objects, const std::string
         return false;
 
     Ehdr ehdr{};
-    unsigned char ident[16] = {0x7f, 'E', 'L', 'F', 2, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0}; /* flawfinder: ignore */
-    std::memcpy(ehdr.e_ident, ident, 16); /* flawfinder: ignore */
+    /* Build the ELF identification bytes directly in the header to avoid a
+     * statically-sized intermediate buffer and an unchecked copy (CWE-120). */
+    ehdr.e_ident[0] = 0x7f;
+    ehdr.e_ident[1] = 'E';
+    ehdr.e_ident[2] = 'L';
+    ehdr.e_ident[3] = 'F';
+    ehdr.e_ident[4] = 2;
+    ehdr.e_ident[5] = 1;
+    ehdr.e_ident[6] = 1;
+    for (std::size_t i = 7; i < 16; ++i)
+        ehdr.e_ident[i] = 0;
     ehdr.e_type = ET_EXEC;
     ehdr.e_machine = EM_AARCH64;
     ehdr.e_version = 1;
@@ -545,7 +554,7 @@ bool link_elf_aarch64(const std::vector<std::string> &objects, const std::string
     };
 
     for (int i = 0; i < 16; i++)
-        f.put(static_cast<char>(ident[i]));
+        f.put(static_cast<char>(ehdr.e_ident[i]));
     w16(ehdr.e_type);
     w16(ehdr.e_machine);
     w32(ehdr.e_version);
