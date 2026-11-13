@@ -1,145 +1,172 @@
 # mk/rules.mk - Build rules.
+#
+# The project is built exclusively with a C17 compiler. Libraries are built
+# as static archives and, for the public modules, as shared objects as well.
 
 .PHONY: all clean test menuconfig olddefconfig help \
         menuconfig-minimal menuconfig-default menuconfig-all \
         install uninstall
 
-all: $(CONFIG_FILE) $(TRACEYC) $(TEST_LEXER) $(BUILD_DIR)/traceyas $(BUILD_DIR)/traceyld \
-     $(BUILD_DIR)/libtracey_source.so $(BUILD_DIR)/libtracey_lexer.so $(BUILD_DIR)/libtracey_argument.so \
-     $(BUILD_DIR)/libtracey_assembler.so $(BUILD_DIR)/libtracey_linker.so $(BUILD_DIR)/libtracey_preprocessor.so $(BUILD_DIR)/libtracey_pipeline.so $(BUILD_DIR)/libtracey_runtime.so
+STATIC_LIBS := $(BUILD_DIR)/libtracey_common.a \
+               $(BUILD_DIR)/libtracey_source.a \
+               $(BUILD_DIR)/libtracey_lexer.a \
+               $(BUILD_DIR)/libtracey_argument.a \
+               $(BUILD_DIR)/libtracey_ast.a \
+               $(BUILD_DIR)/libtracey_parser.a \
+               $(BUILD_DIR)/libtracey_semantic.a \
+               $(BUILD_DIR)/libtracey_codegen.a \
+               $(BUILD_DIR)/libtracey_diagnostics.a \
+               $(BUILD_DIR)/libtracey_preprocessor.a \
+               $(BUILD_DIR)/libtracey_pipeline.a \
+               $(BUILD_DIR)/libtracey_runtime.a \
+               $(BUILD_DIR)/libtracey_elf.a \
+               $(BUILD_DIR)/libtracey_assembler.a \
+               $(BUILD_DIR)/libtracey_linker.a
+
+SHARED_LIBS := $(BUILD_DIR)/libtracey_source.so \
+               $(BUILD_DIR)/libtracey_lexer.so \
+               $(BUILD_DIR)/libtracey_argument.so \
+               $(BUILD_DIR)/libtracey_preprocessor.so \
+               $(BUILD_DIR)/libtracey_pipeline.so \
+               $(BUILD_DIR)/libtracey_runtime.so \
+               $(BUILD_DIR)/libtracey_assembler.so \
+               $(BUILD_DIR)/libtracey_linker.so
+
+all: $(CONFIG_FILE) $(TRACEYC) $(BUILD_DIR)/traceyas $(BUILD_DIR)/traceyld \
+     $(STATIC_LIBS) $(SHARED_LIBS) $(TEST_BINS)
 
 # Bootstrap .config target (safety net; parse-time bootstrap usually creates it).
 $(CONFIG_FILE):
-	python3 scripts/kconfig_tool.py olddefconfig --kconfig Kconfig --config $(CONFIG_FILE)
+	$(PYTHON) scripts/kconfig_tool.py olddefconfig --kconfig Kconfig --config $(CONFIG_FILE)
 
 $(BUILD_DIR):
 	mkdir -p $(BUILD_DIR)
 
 $(KCONFIG_HEADER): Kconfig $(CONFIG_FILE) scripts/kconfig_tool.py | $(BUILD_DIR)
-	python3 scripts/kconfig_tool.py gen-header --kconfig Kconfig --config $(CONFIG_FILE) --header $@
+	$(PYTHON) scripts/kconfig_tool.py gen-header --kconfig Kconfig --config $(CONFIG_FILE) --header $@
 
 $(CONFIG_H): config.h.in | $(BUILD_DIR)
 	sed 's/@PROJECT_VERSION@/$(PROJECT_VERSION)/' config.h.in > $@
 
-$(OBJ_DIR)/%.o: %.cxx $(GENERATED_HEADERS)
+# All object files, including tools, are produced from C sources by this rule.
+$(OBJ_DIR)/%.o: %.c $(GENERATED_HEADERS)
 	@mkdir -p $(dir $@)
-	$(Q)$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $< -o $@
+	$(Q)$(CC) $(CPPFLAGS) $(CFLAGS) -c $< -o $@
 
-$(BUILD_DIR)/libtracey_source.a: $(patsubst %.cxx,$(OBJ_DIR)/%.o,$(SOURCE_SRCS))
+$(BUILD_DIR)/libtracey_common.a: $(patsubst %.c,$(OBJ_DIR)/%.o,$(COMMON_SRCS))
 	$(Q)ar rcs $@ $^
 
-$(BUILD_DIR)/libtracey_lexer.a: $(patsubst %.cxx,$(OBJ_DIR)/%.o,$(LEXER_SRCS))
+$(BUILD_DIR)/libtracey_source.a: $(patsubst %.c,$(OBJ_DIR)/%.o,$(SOURCE_SRCS))
 	$(Q)ar rcs $@ $^
 
-$(BUILD_DIR)/libtracey_argument.a: $(patsubst %.cxx,$(OBJ_DIR)/%.o,$(ARGUMENT_SRCS))
+$(BUILD_DIR)/libtracey_lexer.a: $(patsubst %.c,$(OBJ_DIR)/%.o,$(LEXER_SRCS))
 	$(Q)ar rcs $@ $^
 
-$(OBJ_DIR)/tools/traceyc/main.o: tools/traceyc/main.cxx $(GENERATED_HEADERS)
-	@mkdir -p $(dir $@)
-	$(Q)$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $< -o $@
-	@mkdir -p $(dir $@)
-	$(Q)$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $< -o $@
-
-$(BUILD_DIR)/libtracey_assembler.a: $(patsubst %.cxx,$(OBJ_DIR)/%.o,$(ASSEMBLER_SRCS))
+$(BUILD_DIR)/libtracey_argument.a: $(patsubst %.c,$(OBJ_DIR)/%.o,$(ARGUMENT_SRCS))
 	$(Q)ar rcs $@ $^
 
-$(BUILD_DIR)/libtracey_linker.a: $(patsubst %.cxx,$(OBJ_DIR)/%.o,$(LINKER_SRCS)) $(patsubst %.cxx,$(OBJ_DIR)/%.o,$(ELF_SRCS))
+$(BUILD_DIR)/libtracey_ast.a: $(patsubst %.c,$(OBJ_DIR)/%.o,$(AST_SRCS))
 	$(Q)ar rcs $@ $^
 
-$(BUILD_DIR)/libtracey_pipeline.a: $(patsubst %.cxx,$(OBJ_DIR)/%.o,$(PIPELINE_SRCS))
+$(BUILD_DIR)/libtracey_parser.a: $(patsubst %.c,$(OBJ_DIR)/%.o,$(PARSER_SRCS))
 	$(Q)ar rcs $@ $^
 
-$(BUILD_DIR)/libtracey_pipeline.so: $(BUILD_DIR)/libtracey_pipeline.a
-	$(Q)$(CXX) -shared -o $@ -Wl,--whole-archive $^ -Wl,--no-whole-archive
-
-$(BUILD_DIR)/libtracey_runtime.a: $(patsubst %.cxx,$(OBJ_DIR)/%.o,$(RUNTIME_SRCS))
+$(BUILD_DIR)/libtracey_semantic.a: $(patsubst %.c,$(OBJ_DIR)/%.o,$(SEMANTIC_SRCS))
 	$(Q)ar rcs $@ $^
 
-$(BUILD_DIR)/libtracey_runtime.so: $(BUILD_DIR)/libtracey_runtime.a
-	$(Q)$(CXX) -shared -o $@ -Wl,--whole-archive $^ -Wl,--no-whole-archive
-
-$(BUILD_DIR)/libtracey_preprocessor.a: $(patsubst %.cxx,$(OBJ_DIR)/%.o,$(PREPROCESSOR_SRCS))
+$(BUILD_DIR)/libtracey_codegen.a: $(patsubst %.c,$(OBJ_DIR)/%.o,$(CODEGEN_SRCS))
 	$(Q)ar rcs $@ $^
 
-$(BUILD_DIR)/libtracey_preprocessor.so: $(BUILD_DIR)/libtracey_preprocessor.a
-	$(Q)$(CXX) -shared -o $@ -Wl,--whole-archive $^ -Wl,--no-whole-archive
+$(BUILD_DIR)/libtracey_diagnostics.a: $(patsubst %.c,$(OBJ_DIR)/%.o,$(DIAGNOSTICS_SRCS))
+	$(Q)ar rcs $@ $^
 
-$(BUILD_DIR)/libtracey_source.so: $(patsubst %.cxx,$(OBJ_DIR)/%.o,$(SOURCE_SRCS))
-	$(Q)$(CXX) -shared -o $@ $^
+$(BUILD_DIR)/libtracey_preprocessor.a: $(patsubst %.c,$(OBJ_DIR)/%.o,$(PREPROCESSOR_SRCS))
+	$(Q)ar rcs $@ $^
 
-$(BUILD_DIR)/libtracey_lexer.so: $(patsubst %.cxx,$(OBJ_DIR)/%.o,$(LEXER_SRCS))
-	$(Q)$(CXX) -shared -o $@ $^
+$(BUILD_DIR)/libtracey_pipeline.a: $(patsubst %.c,$(OBJ_DIR)/%.o,$(PIPELINE_SRCS))
+	$(Q)ar rcs $@ $^
 
-$(BUILD_DIR)/libtracey_argument.so: $(patsubst %.cxx,$(OBJ_DIR)/%.o,$(ARGUMENT_SRCS))
-	$(Q)$(CXX) -shared -o $@ $^
+$(BUILD_DIR)/libtracey_runtime.a: $(patsubst %.c,$(OBJ_DIR)/%.o,$(RUNTIME_SRCS))
+	$(Q)ar rcs $@ $^
 
-$(BUILD_DIR)/libtracey_assembler.so: $(BUILD_DIR)/libtracey_assembler.a
-	$(Q)$(CXX) -shared -o $@ -Wl,--whole-archive $^ -Wl,--no-whole-archive
+$(BUILD_DIR)/libtracey_elf.a: $(patsubst %.c,$(OBJ_DIR)/%.o,$(ELF_SRCS))
+	$(Q)ar rcs $@ $^
 
-$(BUILD_DIR)/libtracey_linker.so: $(BUILD_DIR)/libtracey_linker.a
-	$(Q)$(CXX) -shared -o $@ -Wl,--whole-archive $^ -Wl,--no-whole-archive
+$(BUILD_DIR)/libtracey_assembler.a: $(patsubst %.c,$(OBJ_DIR)/%.o,$(ASSEMBLER_SRCS))
+	$(Q)ar rcs $@ $^
 
-$(BUILD_DIR)/traceyas: tools/tracey-as.cxx $(BUILD_DIR)/libtracey_assembler.a
-	$(Q)$(CXX) $(CPPFLAGS) $(CXXFLAGS) tools/tracey-as.cxx -L$(BUILD_DIR) -ltracey_assembler -Wl,-rpath,'$$ORIGIN' -Wl,-rpath,'$(LIBDIR)' -o $@
+$(BUILD_DIR)/libtracey_linker.a: $(patsubst %.c,$(OBJ_DIR)/%.o,$(LINKER_SRCS))
+	$(Q)ar rcs $@ $^
 
-$(BUILD_DIR)/traceyld: tools/tracey-ld.cxx $(BUILD_DIR)/libtracey_linker.a
-	$(Q)$(CXX) $(CPPFLAGS) $(CXXFLAGS) tools/tracey-ld.cxx -L$(BUILD_DIR) -ltracey_linker -Wl,-rpath,'$$ORIGIN' -Wl,-rpath,'$(LIBDIR)' -o $@
+# Shared objects are built from the matching static archive so that the same
+# PIC objects are reused. Undefined references to other modules are resolved
+# when the final executable is linked, or at load time from the installed
+# libraries.
+$(BUILD_DIR)/libtracey_%.so: $(BUILD_DIR)/libtracey_%.a
+	$(Q)$(CC) -shared -o $@ -Wl,--whole-archive $< -Wl,--no-whole-archive $(LDFLAGS)
 
-$(TRACEYC): $(OBJ_DIR)/tools/traceyc/main.o $(BUILD_DIR)/libtracey_source.a $(BUILD_DIR)/libtracey_lexer.a $(BUILD_DIR)/libtracey_argument.a $(BUILD_DIR)/libtracey_assembler.a $(BUILD_DIR)/libtracey_linker.a $(BUILD_DIR)/libtracey_preprocessor.a $(BUILD_DIR)/libtracey_pipeline.a $(BUILD_DIR)/libtracey_runtime.a $(OBJ_DIR)/general/parser/parser.o $(OBJ_DIR)/general/parser/parser_debug.o $(OBJ_DIR)/general/semantic/semantic.o $(OBJ_DIR)/general/codegen/codegen.o $(OBJ_DIR)/general/diagnostics/diagnostics.o
-	$(Q)$(CXX) $(LDFLAGS) $(OBJ_DIR)/tools/traceyc/main.o $(OBJ_DIR)/general/parser/parser.o $(OBJ_DIR)/general/parser/parser_debug.o $(OBJ_DIR)/general/semantic/semantic.o $(OBJ_DIR)/general/codegen/codegen.o $(OBJ_DIR)/general/diagnostics/diagnostics.o -L$(BUILD_DIR) -ltracey_source -ltracey_argument -ltracey_assembler -ltracey_linker -ltracey_pipeline -ltracey_preprocessor -ltracey_lexer -ltracey_runtime $(LDLIBS) -Wl,-rpath,'$$ORIGIN' -Wl,-rpath,'$(LIBDIR)' -o $@
+$(BUILD_DIR)/traceyas: $(OBJ_DIR)/tools/tracey-as.o $(BUILD_DIR)/libtracey_assembler.a $(BUILD_DIR)/libtracey_elf.a $(BUILD_DIR)/libtracey_common.a
+	$(Q)$(CC) $(LDFLAGS) $^ $(LDLIBS) -o $@
 
-$(OBJ_DIR)/doctest_main.o: test/doctest_main.cxx $(GENERATED_HEADERS)
-	@mkdir -p $(dir $@)
-	$(Q)$(CXX) $(CPPFLAGS) $(CXXFLAGS) -I dependencies -c $< -o $@
+$(BUILD_DIR)/traceyld: $(OBJ_DIR)/tools/tracey-ld.o $(BUILD_DIR)/libtracey_linker.a $(BUILD_DIR)/libtracey_elf.a $(BUILD_DIR)/libtracey_common.a
+	$(Q)$(CC) $(LDFLAGS) $^ $(LDLIBS) -o $@
 
-$(OBJ_DIR)/test_lexer.o: test/test_lexer.cxx $(GENERATED_HEADERS)
-	@mkdir -p $(dir $@)
-	$(Q)$(CXX) $(CPPFLAGS) $(CXXFLAGS) -I dependencies -c $< -o $@
+# traceyc is linked statically against every module so that it runs directly
+# from the build directory without a library search path.
+$(TRACEYC): $(OBJ_DIR)/tools/traceyc/main.o \
+            $(BUILD_DIR)/libtracey_pipeline.a \
+            $(BUILD_DIR)/libtracey_codegen.a \
+            $(BUILD_DIR)/libtracey_semantic.a \
+            $(BUILD_DIR)/libtracey_parser.a \
+            $(BUILD_DIR)/libtracey_ast.a \
+            $(BUILD_DIR)/libtracey_lexer.a \
+            $(BUILD_DIR)/libtracey_preprocessor.a \
+            $(BUILD_DIR)/libtracey_source.a \
+            $(BUILD_DIR)/libtracey_argument.a \
+            $(BUILD_DIR)/libtracey_runtime.a \
+            $(BUILD_DIR)/libtracey_assembler.a \
+            $(BUILD_DIR)/libtracey_linker.a \
+            $(BUILD_DIR)/libtracey_elf.a \
+            $(BUILD_DIR)/libtracey_diagnostics.a \
+            $(BUILD_DIR)/libtracey_common.a
+	$(Q)$(CC) $(LDFLAGS) $^ $(LDLIBS) -o $@
 
-$(OBJ_DIR)/test_source.o: test/test_source.cxx $(GENERATED_HEADERS)
-	@mkdir -p $(dir $@)
-	$(Q)$(CXX) $(CPPFLAGS) $(CXXFLAGS) -I dependencies -c $< -o $@
+$(TEST_LEXER): $(OBJ_DIR)/test/test_lexer.o $(BUILD_DIR)/libtracey_lexer.a $(BUILD_DIR)/libtracey_common.a
+	$(Q)$(CC) $(LDFLAGS) $^ $(LDLIBS) -o $@
 
-$(OBJ_DIR)/test_argument.o: test/test_argument.cxx $(GENERATED_HEADERS)
-	@mkdir -p $(dir $@)
-	$(Q)$(CXX) $(CPPFLAGS) $(CXXFLAGS) -I dependencies -c $< -o $@
+$(TEST_SOURCE): $(OBJ_DIR)/test/test_source.o $(BUILD_DIR)/libtracey_source.a $(BUILD_DIR)/libtracey_common.a
+	$(Q)$(CC) $(LDFLAGS) $^ $(LDLIBS) -o $@
 
-$(OBJ_DIR)/test_parser.o: test/test_parser.cxx $(GENERATED_HEADERS)
-	@mkdir -p $(dir $@)
-	$(Q)$(CXX) $(CPPFLAGS) $(CXXFLAGS) -I dependencies -c $< -o $@
+$(TEST_ARGUMENT): $(OBJ_DIR)/test/test_argument.o $(BUILD_DIR)/libtracey_argument.a $(BUILD_DIR)/libtracey_common.a
+	$(Q)$(CC) $(LDFLAGS) $^ $(LDLIBS) -o $@
 
-$(OBJ_DIR)/test_semantic.o: test/test_semantic.cxx $(GENERATED_HEADERS)
-	@mkdir -p $(dir $@)
-	$(Q)$(CXX) $(CPPFLAGS) $(CXXFLAGS) -I dependencies -c $< -o $@
+$(TEST_PARSER): $(OBJ_DIR)/test/test_parser.o $(BUILD_DIR)/libtracey_parser.a $(BUILD_DIR)/libtracey_ast.a $(BUILD_DIR)/libtracey_lexer.a $(BUILD_DIR)/libtracey_common.a
+	$(Q)$(CC) $(LDFLAGS) $^ $(LDLIBS) -o $@
 
-$(TEST_LEXER): $(OBJ_DIR)/doctest_main.o $(OBJ_DIR)/test_lexer.o $(OBJ_DIR)/test_source.o $(OBJ_DIR)/test_argument.o $(BUILD_DIR)/libtracey_lexer.a $(BUILD_DIR)/libtracey_source.a $(BUILD_DIR)/libtracey_argument.a
-	$(Q)$(CXX) $(LDFLAGS) $(OBJ_DIR)/doctest_main.o $(OBJ_DIR)/test_lexer.o $(OBJ_DIR)/test_source.o $(OBJ_DIR)/test_argument.o -L$(BUILD_DIR) -ltracey_lexer -ltracey_source -ltracey_argument $(LDLIBS) -o $@
+$(TEST_SEMANTIC): $(OBJ_DIR)/test/test_semantic.o $(BUILD_DIR)/libtracey_semantic.a $(BUILD_DIR)/libtracey_parser.a $(BUILD_DIR)/libtracey_ast.a $(BUILD_DIR)/libtracey_lexer.a $(BUILD_DIR)/libtracey_common.a
+	$(Q)$(CC) $(LDFLAGS) $^ $(LDLIBS) -o $@
 
-$(TEST_PARSER): $(OBJ_DIR)/doctest_main.o $(OBJ_DIR)/test_parser.o $(OBJ_DIR)/general/parser/parser.o $(OBJ_DIR)/general/parser/parser_debug.o $(BUILD_DIR)/libtracey_lexer.a $(BUILD_DIR)/libtracey_source.a $(BUILD_DIR)/libtracey_argument.a
-	$(Q)$(CXX) $(LDFLAGS) $(OBJ_DIR)/doctest_main.o $(OBJ_DIR)/test_parser.o $(OBJ_DIR)/general/parser/parser.o $(OBJ_DIR)/general/parser/parser_debug.o -L$(BUILD_DIR) -ltracey_lexer -ltracey_source -ltracey_argument $(LDLIBS) -o $@
-
-$(TEST_SEMANTIC): $(OBJ_DIR)/doctest_main.o $(OBJ_DIR)/test_semantic.o $(OBJ_DIR)/general/parser/parser.o $(OBJ_DIR)/general/parser/parser_debug.o $(OBJ_DIR)/general/semantic/semantic.o $(BUILD_DIR)/libtracey_lexer.a $(BUILD_DIR)/libtracey_source.a $(BUILD_DIR)/libtracey_argument.a
-	$(Q)$(CXX) $(LDFLAGS) $(OBJ_DIR)/doctest_main.o $(OBJ_DIR)/test_semantic.o $(OBJ_DIR)/general/parser/parser.o $(OBJ_DIR)/general/parser/parser_debug.o $(OBJ_DIR)/general/semantic/semantic.o -L$(BUILD_DIR) -ltracey_lexer -ltracey_source -ltracey_argument $(LDLIBS) -o $@
-
-test: $(TEST_LEXER) $(TEST_PARSER) $(TEST_SEMANTIC)
-	LD_LIBRARY_PATH=$(BUILD_DIR) $(TEST_LEXER)
-	LD_LIBRARY_PATH=$(BUILD_DIR) $(TEST_PARSER)
-	LD_LIBRARY_PATH=$(BUILD_DIR) $(TEST_SEMANTIC)
+test: $(TEST_BINS)
+	$(Q)$(TEST_LEXER)
+	$(Q)$(TEST_SOURCE)
+	$(Q)$(TEST_ARGUMENT)
+	$(Q)$(TEST_PARSER)
+	$(Q)$(TEST_SEMANTIC)
 
 menuconfig:
-	python3 scripts/kconfig_tool.py menuconfig --kconfig Kconfig --config $(CONFIG_FILE)
+	$(PYTHON) scripts/kconfig_tool.py menuconfig --kconfig Kconfig --config $(CONFIG_FILE)
 
 menuconfig-minimal:
 	cp etc/minimal.config $(CONFIG_FILE)
-	python3 scripts/kconfig_tool.py olddefconfig --kconfig Kconfig --config $(CONFIG_FILE)
+	$(PYTHON) scripts/kconfig_tool.py olddefconfig --kconfig Kconfig --config $(CONFIG_FILE)
 
 menuconfig-default:
 	cp etc/default.config $(CONFIG_FILE)
-	python3 scripts/kconfig_tool.py olddefconfig --kconfig Kconfig --config $(CONFIG_FILE)
+	$(PYTHON) scripts/kconfig_tool.py olddefconfig --kconfig Kconfig --config $(CONFIG_FILE)
 
 menuconfig-all:
 	cp etc/all.config $(CONFIG_FILE)
-	python3 scripts/kconfig_tool.py olddefconfig --kconfig Kconfig --config $(CONFIG_FILE)
+	$(PYTHON) scripts/kconfig_tool.py olddefconfig --kconfig Kconfig --config $(CONFIG_FILE)
 
 help:
 	@echo "Targets:"
@@ -153,12 +180,13 @@ help:
 	@echo "  clean        Remove build directory"
 	@echo ""
 	@echo "Variables:"
+	@echo "  CC=...       C compiler to use (default: cc)"
 	@echo "  V=1          Verbose build"
 	@echo "  ASAN=1       Enable AddressSanitizer"
 	@echo "  UBSAN=1      Enable UBSanitizer"
 
 olddefconfig:
-	python3 scripts/kconfig_tool.py olddefconfig --kconfig Kconfig --config $(CONFIG_FILE)
+	$(PYTHON) scripts/kconfig_tool.py olddefconfig --kconfig Kconfig --config $(CONFIG_FILE)
 
 install: all
 	@mkdir -p $(DESTDIR)$(BINDIR) $(DESTDIR)$(LIBDIR)
@@ -167,7 +195,7 @@ install: all
 	install -m 755 $(BUILD_DIR)/traceyld $(DESTDIR)$(BINDIR)/traceyld
 	install -m 644 lib/stdio.htrc $(DESTDIR)$(LIBDIR)/stdio.htrc
 	install -m 644 lib/stdio.trc $(DESTDIR)$(LIBDIR)/stdio.trc
-	@for lib in $(BUILD_DIR)/libtracey_*.a $(BUILD_DIR)/libtracey_*.so; do \
+	@for lib in $(STATIC_LIBS) $(SHARED_LIBS); do \
 		[ -f "$$lib" ] && install -m 644 "$$lib" $(DESTDIR)$(LIBDIR)/ || true; \
 	done
 	@echo "Installed to $(DESTDIR)$(PREFIX)"
@@ -186,4 +214,4 @@ uninstall:
 clean:
 	rm -rf $(BUILD_DIR)
 
--include $(wildcard $(OBJ_DIR)/*.d) $(wildcard $(OBJ_DIR)/**/*.d)
+-include $(shell find $(OBJ_DIR) -name '*.d' 2>/dev/null)
