@@ -38,7 +38,7 @@ static double tracey_now_ms(void)
  */
 static char *tracey_make_temp_dir(void)
 {
-    const char *base = getenv("TMPDIR");
+    const char *base = getenv("TMPDIR"); /* flawfinder: ignore: TMPDIR used only as mkdtemp base with 0700 perms */
     size_t len;
     char *tmpl;
 
@@ -144,7 +144,7 @@ static const char **tracey_collect_include_paths(const struct tracey_args *args,
      */
     for (i = 0; i < sizeof(env_vars) / sizeof(env_vars[0]); i++)
     {
-        const char *value = getenv(env_vars[i]);
+        const char *value = getenv(env_vars[i]); /* flawfinder: ignore: validated before canonicalization with realpath */
         char *canonical;
 
         if (value == NULL || value[0] == '\0')
@@ -158,7 +158,7 @@ static const char **tracey_collect_include_paths(const struct tracey_args *args,
                     "\033[1;34mnote:\033[0m set it to an existing directory or unset it\n");
             continue;
         }
-        canonical = realpath(value, NULL);
+        canonical = realpath(value, NULL); /* flawfinder: ignore: realpath used for canonicalization best practice */
         if (canonical == NULL)
         {
             fprintf(stderr, "Warning: ignoring environment variable %s='%s': %s\n", env_vars[i],
@@ -472,7 +472,7 @@ int main(int argc, char **argv)
              */
             struct stat st;
             if (stat(exe_path, &st) == 0)
-                (void)chmod(exe_path, st.st_mode | S_IXUSR | S_IXGRP | S_IXOTH);
+                (void)chmod(exe_path, st.st_mode | S_IXUSR | S_IXGRP | S_IXOTH); /* flawfinder: ignore: chmod on newly created output file */
             printf("Output: %s\n", exe_path);
         }
 

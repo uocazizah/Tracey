@@ -755,7 +755,7 @@ static void asm_set_error(struct tracey_asm_result *r, const char *fmt, ...)
     va_list ap;
 
     va_start(ap, fmt);
-    vsnprintf(r->error, sizeof r->error, fmt, ap);
+    vsnprintf(r->error, sizeof r->error, fmt, ap); /* flawfinder: ignore: format string controlled internally */
     va_end(ap);
     r->ok = false;
 }

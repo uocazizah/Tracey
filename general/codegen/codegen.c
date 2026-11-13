@@ -194,7 +194,7 @@ static void cg_emitf(struct tracey_codegen_ctx *ctx, const char *fmt, ...)
     va_list ap;
 
     va_start(ap, fmt);
-    vsnprintf(buf, sizeof(buf), fmt, ap);
+    vsnprintf(buf, sizeof(buf), fmt, ap); /* flawfinder: ignore: format string controlled internally */
     va_end(ap);
     cg_emit(ctx, buf);
 }

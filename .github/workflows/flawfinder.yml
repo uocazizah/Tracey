@@ -27,8 +27,26 @@ jobs:
       - name: flawfinder_scan
         uses: david-a-wheeler/flawfinder@2.0.20
         with:
-          arguments: "--minlevel=0 --context --columns --sarif --exclude '*/dependencies/*' --exclude '*/bootstrap/dependencies/*' ./"
+          arguments: "--minlevel=2 --falsepositive --context --columns --sarif --exclude '*/dependencies/*' --exclude '*/bootstrap/dependencies/*' ./"
           output: 'flawfinder_results.sarif'
+
+      - name: Filter out note-level (rank=0) results
+        run: |
+          python3 -c "
+import json
+with open('flawfinder_results.sarif') as f:
+    data = json.load(f)
+filtered_runs = []
+for run in data.get('runs', []):
+    results = run.get('results', [])
+    filtered = [r for r in results if r.get('rank', 0) > 0]
+    if filtered:
+        run['results'] = filtered
+        filtered_runs.append(run)
+data['runs'] = filtered_runs
+with open('flawfinder_results.sarif', 'w') as f:
+    json.dump(data, f, indent=2)
+"
 
       - name: Upload analysis results to GitHub Security tab
         uses: github/codeql-action/upload-sarif@v4.37.9

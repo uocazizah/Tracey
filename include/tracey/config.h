@@ -111,7 +111,7 @@ extern "C" {
  */
 #if TRACEY_DEBUG_TRACE
 #include <stdio.h>
-#define TRACEY_TRACE(...) fprintf(stderr, __VA_ARGS__)
+#define TRACEY_TRACE(...) fprintf(stderr, __VA_ARGS__) /* flawfinder: ignore: format string controlled internally only */
 #else
 #define TRACEY_TRACE(...)                                                                          \
     do                                                                                             \

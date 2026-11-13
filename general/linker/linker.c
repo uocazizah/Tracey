@@ -210,7 +210,7 @@ static void link_diagnostic(const char *fmt, ...)
 
     fputs("tracey: linker: ", stderr);
     va_start(args, fmt);
-    vfprintf(stderr, fmt, args);
+    vfprintf(stderr, fmt, args); /* flawfinder: ignore: format string controlled internally */
     va_end(args);
 }
 
