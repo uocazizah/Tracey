@@ -2,9 +2,9 @@
 
 ## Requirements
 
-- C++23 compiler (GCC or Clang)
+- ISO C17 compiler (GCC or Clang)
 - Python 3 (for Kconfig)
-- Make or CMake
+- GNU Make
 
 ## Make
 
@@ -53,15 +53,6 @@ Build outputs:
 - `build/traceyas` — assembler
 - `build/traceyld` — linker
 - `build/tracey_lexer_test` — unit tests
-
-## CMake
-
-```bash
-cd .
-cmake -S . -B build
-cmake --build build
-ctest --test-dir build
-```
 
 ## Configuration
 
