@@ -33,7 +33,7 @@ jobs:
       - name: Filter out note-level (rank=0) results
         run: |
           python3 -c "
-          import json
+          import json, os
           with open('flawfinder_results.sarif') as f:
               data = json.load(f)
           filtered_runs = []
@@ -44,6 +44,8 @@ jobs:
                   run['results'] = filtered
                   filtered_runs.append(run)
           data['runs'] = filtered_runs
+          if os.path.exists('flawfinder_results.sarif'):
+              os.remove('flawfinder_results.sarif')
           with open('flawfinder_results.sarif', 'w') as f:
               json.dump(data, f, indent=2)
           "
