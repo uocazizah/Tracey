@@ -1,15 +1,15 @@
 # Lexer
 
 Specification and implementation notes for the bootstrap compiler's lexer
-(` include/tracey/lexer.hxx`, ` general/lexer/`).
+(` include/tracey/lexer.h`, ` general/lexer/`).
 
 This document is the reference for what the lexer currently accepts. The
 parser and later stages must agree with it; when a rule here changes, update
-the unit tests in ` test/test_lexer.cxx` in the same change.
+the unit tests in ` test/test_lexer.c` in the same change.
 
 ## Model
 
-- Input is an in-memory `std::string_view` produced by `tracey::source`. The
+- Input is an in-memory `struct tracey_string_view` produced by `tracey::source`. The
   lexer is byte-oriented: a byte ≥ 0x80 is an invalid character for now
   (UTF-8 identifiers are future work).
 - Token lexemes are non-owning views into the source buffer; they stay valid
@@ -131,11 +131,10 @@ seen. The token dump is printed only with `--verbose`.
 
 ## Testing
 
-Unit tests live in ` test/test_lexer.cxx` (doctest, vendored under
-` dependencies/doctest`), including a deterministic fuzz-lite case
+Unit tests live in ` test/test_lexer.c` (built with the repository's small
+C17 harness in ` test/test_harness.h`), including a deterministic fuzz-lite case
 that asserts lexeme bounds and progress on arbitrary bytes. Run:
 
 ```
-cmake --build <build-dir> -j
-ctest --test-dir <build-dir> --output-on-failure
+make test
 ```
