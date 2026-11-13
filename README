@@ -40,7 +40,7 @@ See docs/README for the documentation index.
 Development
 --------------
 
-Tracey is currently being developed using C++ (C++23).
+Tracey is currently being developed using ISO C17.
 
 Current focus:
 
@@ -65,7 +65,7 @@ See docs/build.md for full build instructions.
 Coding Style
 ------------
 
-All C/C++ code follows AGENTS.md. See docs/maintenance.md.
+All C code follows AGENTS.md. See docs/maintenance.md.
 
 Contributing
 ---------------
