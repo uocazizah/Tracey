@@ -30,7 +30,7 @@ arg_list       := expression (',' expression)*
 
 ## AST
 
-AST node types are defined in `include/tracey/ast.hxx`:
+AST node types are defined in `include/tracey/ast.h`:
 
 - `program` — list of `function_decl`.
 - `function_decl` — return type, name, parameters, body.
