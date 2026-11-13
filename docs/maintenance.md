@@ -2,7 +2,7 @@
 
 ## Coding style
 
-All C/C++ code follows `AGENTS.md` at the repository root:
+All C code follows `AGENTS.md` at the repository root:
 
 - `lowercase_with_underscores` for identifiers.
 - 4 spaces, no tabs, Allman braces.
@@ -11,7 +11,7 @@ All C/C++ code follows `AGENTS.md` at the repository root:
 
 ## Formatting
 
-C/C++ files are formatted with `clang-format` using the repository
+C files are formatted with `clang-format` using the repository
 `.clang-format`. Run:
 
 ```bash
