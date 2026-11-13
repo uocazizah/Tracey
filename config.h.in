@@ -1,14 +1,14 @@
 #ifndef TRACEY_BUILD_CONFIG_H
 #define TRACEY_BUILD_CONFIG_H
 
-/* CMake-generated build metadata for the Tracey bootstrap compiler.
+/* Build-generated metadata for the Tracey bootstrap compiler.
  *
- * Only values that CMake itself resolves (project version, toolchain checks)
- * live here. Feature toggles come from Kconfig via kconfig_autoconf.h, which
- * is included by <tracey/config.hxx>.
+ * Only values that the build system itself resolves (project version,
+ * toolchain checks) live here. Feature toggles come from Kconfig via kconfig_autoconf.h, which
+ * is included by <tracey/config.h>.
  */
 
-/* Project version, forwarded from project(VERSION ...) in CMakeLists.txt. */
+/* Project version, forwarded from PROJECT_VERSION by mk/toolchain.mk. */
 #define TRACEY_VERSION_STRING "@PROJECT_VERSION@"
 
 #endif /* TRACEY_BUILD_CONFIG_H */
