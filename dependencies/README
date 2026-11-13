@@ -2,6 +2,6 @@ dependencies
 
 for external packages & sources
 
-doctest/
-    Vendored doctest single-header unit test framework (v2.5.3, MIT).
-    Used by the bootstrap test suite; see bootstrap/test/.
+The compiler and its test suite are written in ISO C17 and use no external
+source dependencies. The former vendored doctest framework has been removed
+now that the tests use the small C harness in test/test_harness.h.
