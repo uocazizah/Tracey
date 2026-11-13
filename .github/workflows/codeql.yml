@@ -84,7 +84,7 @@ jobs:
                 id: cpp/unused-static-function
     - name: setup tools
       run: |
-        sudo apt update && sudo apt install -y gcc g++ gcc-14 g++-14 make python3-pip
+        sudo apt update && sudo apt install -y gcc gcc-14 make python3-pip
     - name: Install Python dependencies
       run: |
         python3 -m pip install --upgrade pip
@@ -99,7 +99,7 @@ jobs:
       if: matrix.build-mode == 'manual'
       shell: bash
       run: |
-        make CXX=g++-14
+        make CC=gcc-14
     - name: Perform CodeQL Analysis
       uses: github/codeql-action/analyze@v4.37.9
       with:
