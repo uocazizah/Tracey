@@ -2,7 +2,7 @@
 
 ## Overview
 
-The semantic analyzer (`include/tracey/semantic.hxx`, `general/semantic/semantic.cxx`)
+The semantic analyzer (`include/tracey/semantic.h`, `general/semantic/semantic.c`)
 validates the AST before code generation.
 
 ## Symbol table
