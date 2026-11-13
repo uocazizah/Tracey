@@ -1,0 +1,37 @@
+name: Build AArch64 Linux GNU GCC
+
+on:
+  push:
+    branches: [ "master" ]
+  pull_request:
+    branches: [ "master" ]
+
+jobs:
+  build:
+    name: AArch64 Linux GNU GCC
+    runs-on: ubuntu-24.04-arm
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential gcc-14 pkg-config python3-pip
+
+      - name: Install Python dependencies
+        run: |
+          python3 -m pip install --upgrade pip
+          python3 -m pip install kconfiglib
+
+      - name: Build
+        run: make CC=gcc-14
+
+      - name: Run tests
+        run: make test
+
+      - name: Smoke test
+        run: |
+          ./build/traceyc index.trc
+          ./build/traceyc --version
+          ./build/traceyc --help
