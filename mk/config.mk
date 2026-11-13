@@ -5,6 +5,11 @@
 
 CONFIG_FILE ?= .config
 
+# Python interpreter providing kconfiglib. The system python3 is preferred;
+# the Termux interpreter is used as a fallback on hosts where the system
+# python3 lacks kconfiglib.
+PYTHON ?= $(shell python3 -c 'import kconfiglib' >/dev/null 2>&1 && echo python3 || echo /data/data/com.termux/files/usr/bin/python3)
+
 # Only bootstrap when the requested goals actually need a build. This keeps
 # `make clean`, `make help`, and the menuconfig targets from creating .config.
 BUILD_GOALS := $(if $(MAKECMDGOALS),$(filter-out clean help menuconfig% olddefconfig,$(MAKECMDGOALS)),all)
@@ -12,7 +17,7 @@ BUILD_GOALS := $(if $(MAKECMDGOALS),$(filter-out clean help menuconfig% olddefco
 ifneq ($(BUILD_GOALS),)
 ifeq ($(wildcard $(CONFIG_FILE)),)
   $(info .config not found; generating default configuration...)
-  _BOOTSTRAP := $(shell python3 scripts/kconfig_tool.py olddefconfig --kconfig Kconfig --config $(CONFIG_FILE))
+  _BOOTSTRAP := $(shell $(PYTHON) scripts/kconfig_tool.py olddefconfig --kconfig Kconfig --config $(CONFIG_FILE))
 endif
 endif
 
