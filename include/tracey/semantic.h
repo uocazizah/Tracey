@@ -46,6 +46,13 @@ struct tracey_semantic_analyzer
     struct tracey_semantic_scope *scopes;
     size_t scope_count;
     size_t scope_cap;
+    int loop_depth;
+    char **goto_labels;
+    size_t goto_label_count;
+    size_t goto_label_cap;
+    char **declared_labels;
+    size_t declared_label_count;
+    size_t declared_label_cap;
 };
 
 void tracey_semantic_init(struct tracey_semantic_analyzer *sa);
