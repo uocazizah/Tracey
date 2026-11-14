@@ -20,10 +20,25 @@ enum tracey_type_kind
 {
     TRACEY_TYPE_VOID = 0,
     TRACEY_TYPE_INT,
+    TRACEY_TYPE_UNSIGNED_INT,
     TRACEY_TYPE_BOOL,
     TRACEY_TYPE_CHAR,
+    TRACEY_TYPE_SHORT,
+    TRACEY_TYPE_UNSIGNED_SHORT,
+    TRACEY_TYPE_LONG,
+    TRACEY_TYPE_UNSIGNED_LONG,
+    TRACEY_TYPE_LONG_LONG,
+    TRACEY_TYPE_UNSIGNED_LONG_LONG,
+    TRACEY_TYPE_SIZE_T,
     TRACEY_TYPE_CHAR_PTR,
     TRACEY_TYPE_INT_PTR,
+    TRACEY_TYPE_SHORT_PTR,
+    TRACEY_TYPE_UNSIGNED_SHORT_PTR,
+    TRACEY_TYPE_LONG_PTR,
+    TRACEY_TYPE_UNSIGNED_LONG_PTR,
+    TRACEY_TYPE_LONG_LONG_PTR,
+    TRACEY_TYPE_UNSIGNED_LONG_LONG_PTR,
+    TRACEY_TYPE_SIZE_T_PTR,
     TRACEY_TYPE_FLOAT,
     TRACEY_TYPE_DOUBLE,
     TRACEY_TYPE_FLOAT_PTR,
@@ -34,6 +49,7 @@ enum tracey_unary_op
 {
     TRACEY_UNARY_NEG = 0,
     TRACEY_UNARY_LOG_NOT,
+    TRACEY_UNARY_BIT_NOT,
 };
 
 enum tracey_binary_op
@@ -51,7 +67,22 @@ enum tracey_binary_op
     TRACEY_BINARY_GE,
     TRACEY_BINARY_LOG_AND,
     TRACEY_BINARY_LOG_OR,
+    TRACEY_BINARY_BIT_AND,
+    TRACEY_BINARY_BIT_OR,
+    TRACEY_BINARY_BIT_XOR,
+    TRACEY_BINARY_SHIFT_LEFT,
+    TRACEY_BINARY_SHIFT_RIGHT,
     TRACEY_BINARY_ASSIGN,
+    TRACEY_BINARY_ADD_ASSIGN,
+    TRACEY_BINARY_SUB_ASSIGN,
+    TRACEY_BINARY_MUL_ASSIGN,
+    TRACEY_BINARY_DIV_ASSIGN,
+    TRACEY_BINARY_MOD_ASSIGN,
+    TRACEY_BINARY_SHL_ASSIGN,
+    TRACEY_BINARY_SHR_ASSIGN,
+    TRACEY_BINARY_AND_ASSIGN,
+    TRACEY_BINARY_OR_ASSIGN,
+    TRACEY_BINARY_XOR_ASSIGN,
 };
 
 enum tracey_expr_kind
@@ -60,6 +91,7 @@ enum tracey_expr_kind
     TRACEY_EXPR_BOOL,
     TRACEY_EXPR_REAL,
     TRACEY_EXPR_STRING,
+    TRACEY_EXPR_CHAR,
     TRACEY_EXPR_IDENT,
     TRACEY_EXPR_UNARY,
     TRACEY_EXPR_BINARY,
@@ -67,6 +99,7 @@ enum tracey_expr_kind
     TRACEY_EXPR_ADDR,
     TRACEY_EXPR_DEREF,
     TRACEY_EXPR_CALL,
+    TRACEY_EXPR_TERNARY,
 };
 
 enum tracey_stmt_kind
@@ -76,6 +109,11 @@ enum tracey_stmt_kind
     TRACEY_STMT_EXPR,
     TRACEY_STMT_IF,
     TRACEY_STMT_WHILE,
+    TRACEY_STMT_FOR,
+    TRACEY_STMT_BREAK,
+    TRACEY_STMT_CONTINUE,
+    TRACEY_STMT_GOTO,
+    TRACEY_STMT_LABEL,
     TRACEY_STMT_RETURN,
 };
 
@@ -144,6 +182,18 @@ struct tracey_call_expr
     size_t arg_count;
 };
 
+struct tracey_char_expr
+{
+    int value;
+};
+
+struct tracey_ternary_expr
+{
+    struct tracey_expr *condition;
+    struct tracey_expr *then_branch;
+    struct tracey_expr *else_branch;
+};
+
 /*
  * Expression node.
  *
@@ -161,6 +211,7 @@ struct tracey_expr
         struct tracey_bool_expr bool_expr;
         struct tracey_real_expr real_expr;
         struct tracey_string_expr string_expr;
+        struct tracey_char_expr char_expr;
         struct tracey_ident_expr ident_expr;
         struct tracey_unary_expr unary_expr;
         struct tracey_binary_expr binary_expr;
@@ -168,6 +219,7 @@ struct tracey_expr
         struct tracey_addr_expr addr_expr;
         struct tracey_deref_expr deref_expr;
         struct tracey_call_expr call_expr;
+        struct tracey_ternary_expr ternary_expr;
     } as;
 };
 
@@ -203,6 +255,25 @@ struct tracey_while_stmt
     struct tracey_stmt *body;
 };
 
+struct tracey_for_stmt
+{
+    struct tracey_stmt *init;     /* NULL when no initializer */
+    struct tracey_expr *condition; /* NULL when no condition */
+    struct tracey_expr *update;    /* NULL when no update */
+    struct tracey_stmt *body;
+};
+
+struct tracey_goto_stmt
+{
+    char *label;
+};
+
+struct tracey_label_stmt
+{
+    char *label;
+    struct tracey_stmt *stmt;
+};
+
 struct tracey_return_stmt
 {
     struct tracey_expr *value;
@@ -225,6 +296,9 @@ struct tracey_stmt
         struct tracey_expr_stmt expr_stmt;
         struct tracey_if_stmt if_stmt;
         struct tracey_while_stmt while_stmt;
+        struct tracey_for_stmt for_stmt;
+        struct tracey_goto_stmt goto_stmt;
+        struct tracey_label_stmt label_stmt;
         struct tracey_return_stmt return_stmt;
     } as;
 };
