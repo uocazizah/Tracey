@@ -38,6 +38,16 @@ static void tracey_semantic_scope_free(struct tracey_semantic_scope *scope)
     scope->cap = 0;
 }
 
+static void tracey_semantic_string_array_free(char **items, size_t count)
+{
+    size_t i;
+    if (items == NULL)
+        return;
+    for (i = 0; i < count; i++)
+        free(items[i]);
+    free(items);
+}
+
 void tracey_semantic_free(struct tracey_semantic_analyzer *sa)
 {
     size_t i;
@@ -49,6 +59,8 @@ void tracey_semantic_free(struct tracey_semantic_analyzer *sa)
     for (i = 0; i < sa->scope_count; i++)
         tracey_semantic_scope_free(&sa->scopes[i]);
     free(sa->scopes);
+    tracey_semantic_string_array_free(sa->goto_labels, sa->goto_label_count);
+    tracey_semantic_string_array_free(sa->declared_labels, sa->declared_label_count);
     tracey_semantic_init(sa);
 }
 
@@ -187,7 +199,72 @@ static void tracey_semantic_check_stmt(struct tracey_semantic_analyzer *sa, stru
 
 static bool tracey_is_numeric(enum tracey_type_kind t)
 {
-    return t == TRACEY_TYPE_INT || t == TRACEY_TYPE_FLOAT || t == TRACEY_TYPE_DOUBLE;
+    return t == TRACEY_TYPE_INT || t == TRACEY_TYPE_UNSIGNED_INT ||
+           t == TRACEY_TYPE_BOOL || t == TRACEY_TYPE_CHAR ||
+           t == TRACEY_TYPE_SHORT || t == TRACEY_TYPE_UNSIGNED_SHORT ||
+           t == TRACEY_TYPE_LONG || t == TRACEY_TYPE_UNSIGNED_LONG ||
+           t == TRACEY_TYPE_LONG_LONG || t == TRACEY_TYPE_UNSIGNED_LONG_LONG ||
+           t == TRACEY_TYPE_SIZE_T || t == TRACEY_TYPE_FLOAT || t == TRACEY_TYPE_DOUBLE;
+}
+
+static bool tracey_is_integer(enum tracey_type_kind t)
+{
+    return t == TRACEY_TYPE_INT || t == TRACEY_TYPE_UNSIGNED_INT ||
+           t == TRACEY_TYPE_CHAR || t == TRACEY_TYPE_SHORT ||
+           t == TRACEY_TYPE_UNSIGNED_SHORT || t == TRACEY_TYPE_LONG ||
+           t == TRACEY_TYPE_UNSIGNED_LONG || t == TRACEY_TYPE_LONG_LONG ||
+           t == TRACEY_TYPE_UNSIGNED_LONG_LONG || t == TRACEY_TYPE_SIZE_T;
+}
+
+static bool tracey_is_pointer(enum tracey_type_kind t)
+{
+    switch (t)
+    {
+        case TRACEY_TYPE_CHAR_PTR:
+        case TRACEY_TYPE_INT_PTR:
+        case TRACEY_TYPE_SHORT_PTR:
+        case TRACEY_TYPE_UNSIGNED_SHORT_PTR:
+        case TRACEY_TYPE_LONG_PTR:
+        case TRACEY_TYPE_UNSIGNED_LONG_PTR:
+        case TRACEY_TYPE_LONG_LONG_PTR:
+        case TRACEY_TYPE_UNSIGNED_LONG_LONG_PTR:
+        case TRACEY_TYPE_SIZE_T_PTR:
+        case TRACEY_TYPE_FLOAT_PTR:
+        case TRACEY_TYPE_DOUBLE_PTR:
+            return true;
+        default:
+            return false;
+    }
+}
+
+static enum tracey_type_kind tracey_pointer_element_type(enum tracey_type_kind t)
+{
+    switch (t)
+    {
+        case TRACEY_TYPE_CHAR_PTR: return TRACEY_TYPE_CHAR;
+        case TRACEY_TYPE_INT_PTR: return TRACEY_TYPE_INT;
+        case TRACEY_TYPE_UNSIGNED_INT: return TRACEY_TYPE_UNSIGNED_INT;
+        case TRACEY_TYPE_SHORT_PTR: return TRACEY_TYPE_SHORT;
+        case TRACEY_TYPE_UNSIGNED_SHORT_PTR: return TRACEY_TYPE_UNSIGNED_SHORT;
+        case TRACEY_TYPE_LONG_PTR: return TRACEY_TYPE_LONG;
+        case TRACEY_TYPE_UNSIGNED_LONG_PTR: return TRACEY_TYPE_UNSIGNED_LONG;
+        case TRACEY_TYPE_LONG_LONG_PTR: return TRACEY_TYPE_LONG_LONG;
+        case TRACEY_TYPE_UNSIGNED_LONG_LONG_PTR: return TRACEY_TYPE_UNSIGNED_LONG_LONG;
+        case TRACEY_TYPE_SIZE_T_PTR: return TRACEY_TYPE_SIZE_T;
+        case TRACEY_TYPE_FLOAT_PTR: return TRACEY_TYPE_FLOAT;
+        case TRACEY_TYPE_DOUBLE_PTR: return TRACEY_TYPE_DOUBLE;
+        default: return TRACEY_TYPE_INT;
+    }
+}
+
+static bool tracey_types_assignable(enum tracey_type_kind dst, enum tracey_type_kind src)
+{
+    if (dst == src)
+        return true;
+    /* Allow integer-to-integer assignment (with possible narrowing/widening). */
+    if (tracey_is_integer(dst) && tracey_is_integer(src))
+        return true;
+    return false;
 }
 
 static enum tracey_type_kind tracey_semantic_check_expr(struct tracey_semantic_analyzer *sa,
@@ -208,6 +285,8 @@ static enum tracey_type_kind tracey_semantic_check_expr(struct tracey_semantic_a
             return e->as.real_expr.is_float ? TRACEY_TYPE_FLOAT : TRACEY_TYPE_DOUBLE;
         case TRACEY_EXPR_STRING:
             return TRACEY_TYPE_CHAR_PTR;
+        case TRACEY_EXPR_CHAR:
+            return TRACEY_TYPE_CHAR;
         case TRACEY_EXPR_IDENT:
         {
             struct tracey_semantic_symbol sym;
@@ -265,15 +344,25 @@ static enum tracey_type_kind tracey_semantic_check_expr(struct tracey_semantic_a
             enum tracey_type_kind t = tracey_semantic_check_expr(sa, e->as.unary_expr.operand, fn);
             if (e->as.unary_expr.op == TRACEY_UNARY_NEG)
             {
-                if (t == TRACEY_TYPE_INT) return TRACEY_TYPE_INT;
-                if (t == TRACEY_TYPE_FLOAT) return TRACEY_TYPE_FLOAT;
-                if (t == TRACEY_TYPE_DOUBLE) return TRACEY_TYPE_DOUBLE;
+                if (tracey_is_numeric(t))
+                    return t;
                 tracey_semantic_error(sa, "Unary '-' requires numeric", e->loc);
                 return TRACEY_TYPE_INT;
             }
-            if (t != TRACEY_TYPE_BOOL)
-                tracey_semantic_error(sa, "'!' requires bool", e->loc);
-            return TRACEY_TYPE_BOOL;
+            if (e->as.unary_expr.op == TRACEY_UNARY_LOG_NOT)
+            {
+                if (t != TRACEY_TYPE_BOOL)
+                    tracey_semantic_error(sa, "'!' requires bool", e->loc);
+                return TRACEY_TYPE_BOOL;
+            }
+            if (e->as.unary_expr.op == TRACEY_UNARY_BIT_NOT)
+            {
+                if (tracey_is_integer(t))
+                    return t;
+                tracey_semantic_error(sa, "Unary '~' requires integer", e->loc);
+                return TRACEY_TYPE_INT;
+            }
+            return TRACEY_TYPE_INT;
         }
         case TRACEY_EXPR_BINARY:
         {
@@ -342,32 +431,115 @@ static enum tracey_type_kind tracey_semantic_check_expr(struct tracey_semantic_a
                 enum tracey_type_kind rt = tracey_semantic_check_expr(sa, e->as.binary_expr.right, fn);
                 switch (e->as.binary_expr.op)
                 {
+                    case TRACEY_BINARY_ASSIGN:
+                    case TRACEY_BINARY_ADD_ASSIGN:
+                    case TRACEY_BINARY_SUB_ASSIGN:
+                    case TRACEY_BINARY_MUL_ASSIGN:
+                    case TRACEY_BINARY_DIV_ASSIGN:
+                    case TRACEY_BINARY_MOD_ASSIGN:
+                    case TRACEY_BINARY_SHL_ASSIGN:
+                    case TRACEY_BINARY_SHR_ASSIGN:
+                    case TRACEY_BINARY_AND_ASSIGN:
+                    case TRACEY_BINARY_OR_ASSIGN:
+                    case TRACEY_BINARY_XOR_ASSIGN:
+                    {
+                        struct tracey_expr *lhs = e->as.binary_expr.left;
+                        if (lhs && lhs->kind == TRACEY_EXPR_IDENT)
+                        {
+                            struct tracey_semantic_symbol sym;
+                            if (!tracey_semantic_lookup(sa, lhs->as.ident_expr.name, &sym) || sym.is_function)
+                            {
+                                char buf[256];
+                                snprintf(buf, sizeof(buf), "Undefined variable '%s'", lhs->as.ident_expr.name);
+                                tracey_semantic_error(sa, buf, e->loc);
+                                (void)tracey_semantic_check_expr(sa, e->as.binary_expr.right, fn);
+                                return TRACEY_TYPE_INT;
+                            }
+                            {
+                                enum tracey_type_kind rt2 = tracey_semantic_check_expr(sa, e->as.binary_expr.right, fn);
+                                if (!tracey_types_assignable(sym.type, rt2))
+                                    tracey_semantic_error(sa, "Type mismatch in assignment", e->loc);
+                                return sym.type;
+                            }
+                        }
+                        if (lhs && lhs->kind == TRACEY_EXPR_INDEX)
+                        {
+                            enum tracey_type_kind bt = tracey_semantic_check_expr(sa, lhs->as.index_expr.base, fn);
+                            enum tracey_type_kind it = tracey_semantic_check_expr(sa, lhs->as.index_expr.index, fn);
+                            enum tracey_type_kind elem = TRACEY_TYPE_INT;
+                            if (it != TRACEY_TYPE_INT)
+                                tracey_semantic_error(sa, "Array index must be int", lhs->loc);
+                            if (bt == TRACEY_TYPE_CHAR_PTR) elem = TRACEY_TYPE_CHAR;
+                            else if (bt == TRACEY_TYPE_FLOAT_PTR) elem = TRACEY_TYPE_FLOAT;
+                            else if (bt == TRACEY_TYPE_DOUBLE_PTR) elem = TRACEY_TYPE_DOUBLE;
+                            else if (bt == TRACEY_TYPE_LONG_PTR) elem = TRACEY_TYPE_LONG;
+                            else if (bt == TRACEY_TYPE_UNSIGNED_LONG_PTR) elem = TRACEY_TYPE_UNSIGNED_LONG;
+                            else if (bt == TRACEY_TYPE_LONG_LONG_PTR) elem = TRACEY_TYPE_LONG_LONG;
+                            else if (bt == TRACEY_TYPE_UNSIGNED_LONG_LONG_PTR) elem = TRACEY_TYPE_UNSIGNED_LONG_LONG;
+                            else if (bt == TRACEY_TYPE_SHORT_PTR) elem = TRACEY_TYPE_SHORT;
+                            else if (bt == TRACEY_TYPE_UNSIGNED_SHORT_PTR) elem = TRACEY_TYPE_UNSIGNED_SHORT;
+                            else if (bt == TRACEY_TYPE_SIZE_T_PTR) elem = TRACEY_TYPE_SIZE_T;
+                            else if (bt != TRACEY_TYPE_INT_PTR)
+                                tracey_semantic_error(sa, "Subscript requires array or pointer", lhs->loc);
+                            {
+                                enum tracey_type_kind rt2 = tracey_semantic_check_expr(sa, e->as.binary_expr.right, fn);
+                                if (!tracey_types_assignable(elem, rt2))
+                                    tracey_semantic_error(sa, "Type mismatch in assignment", e->loc);
+                            }
+                            return elem;
+                        }
+                        if (lhs && lhs->kind == TRACEY_EXPR_DEREF)
+                        {
+                            enum tracey_type_kind pt = tracey_semantic_check_expr(sa, lhs->as.deref_expr.operand, fn);
+                            enum tracey_type_kind elem = tracey_pointer_element_type(pt);
+                            if (!tracey_is_pointer(pt))
+                                tracey_semantic_error(sa, "Cannot dereference non-pointer", lhs->loc);
+                            {
+                                enum tracey_type_kind rt2 = tracey_semantic_check_expr(sa, e->as.binary_expr.right, fn);
+                                if (!tracey_types_assignable(elem, rt2))
+                                    tracey_semantic_error(sa, "Type mismatch in assignment", e->loc);
+                            }
+                            return elem;
+                        }
+                        tracey_semantic_error(sa, "Invalid assignment target", e->loc);
+                        (void)tracey_semantic_check_expr(sa, e->as.binary_expr.right, fn);
+                        return TRACEY_TYPE_INT;
+                    }
                     case TRACEY_BINARY_ADD:
                     case TRACEY_BINARY_SUB:
                     case TRACEY_BINARY_MUL:
                     case TRACEY_BINARY_DIV:
                         if (lt == TRACEY_TYPE_DOUBLE || rt == TRACEY_TYPE_DOUBLE)
                         {
-                            if ((lt == TRACEY_TYPE_DOUBLE || lt == TRACEY_TYPE_INT || lt == TRACEY_TYPE_FLOAT) &&
-                                (rt == TRACEY_TYPE_DOUBLE || rt == TRACEY_TYPE_INT || rt == TRACEY_TYPE_FLOAT))
+                            if (tracey_is_numeric(lt) && tracey_is_numeric(rt))
                                 return TRACEY_TYPE_DOUBLE;
                             tracey_semantic_error(sa, "Arithmetic requires numeric operands", e->loc);
                             return TRACEY_TYPE_DOUBLE;
                         }
                         if (lt == TRACEY_TYPE_FLOAT || rt == TRACEY_TYPE_FLOAT)
                         {
-                            if ((lt == TRACEY_TYPE_FLOAT || lt == TRACEY_TYPE_INT) &&
-                                (rt == TRACEY_TYPE_FLOAT || rt == TRACEY_TYPE_INT))
+                            if (tracey_is_numeric(lt) && tracey_is_numeric(rt))
                                 return TRACEY_TYPE_FLOAT;
                             tracey_semantic_error(sa, "Arithmetic requires numeric operands", e->loc);
                             return TRACEY_TYPE_FLOAT;
                         }
-                        if (lt != TRACEY_TYPE_INT || rt != TRACEY_TYPE_INT)
-                            tracey_semantic_error(sa, "Arithmetic requires int operands", e->loc);
+                        if (tracey_is_integer(lt) && tracey_is_integer(rt))
+                        {
+                            /* Promote to the wider integer type. */
+                            if (lt == TRACEY_TYPE_LONG_LONG || rt == TRACEY_TYPE_LONG_LONG)
+                                return TRACEY_TYPE_LONG_LONG;
+                            if (lt == TRACEY_TYPE_LONG || rt == TRACEY_TYPE_LONG)
+                                return TRACEY_TYPE_LONG;
+                            if (lt == TRACEY_TYPE_SIZE_T || rt == TRACEY_TYPE_SIZE_T)
+                                return TRACEY_TYPE_SIZE_T;
+                            return TRACEY_TYPE_INT;
+                        }
+                        tracey_semantic_error(sa, "Arithmetic requires numeric operands", e->loc);
                         return TRACEY_TYPE_INT;
                     case TRACEY_BINARY_MOD:
-                        if (lt != TRACEY_TYPE_INT || rt != TRACEY_TYPE_INT)
-                            tracey_semantic_error(sa, "Modulo requires int operands", e->loc);
+                        if (tracey_is_integer(lt) && tracey_is_integer(rt))
+                            return TRACEY_TYPE_INT;
+                        tracey_semantic_error(sa, "Modulo requires integer operands", e->loc);
                         return TRACEY_TYPE_INT;
                     case TRACEY_BINARY_EQ:
                     case TRACEY_BINARY_NE:
@@ -387,6 +559,25 @@ static enum tracey_type_kind tracey_semantic_check_expr(struct tracey_semantic_a
                         if (lt != TRACEY_TYPE_BOOL || rt != TRACEY_TYPE_BOOL)
                             tracey_semantic_error(sa, "Logical requires bool operands", e->loc);
                         return TRACEY_TYPE_BOOL;
+                    case TRACEY_BINARY_BIT_AND:
+                    case TRACEY_BINARY_BIT_OR:
+                    case TRACEY_BINARY_BIT_XOR:
+                        if (tracey_is_integer(lt) && tracey_is_integer(rt))
+                        {
+                            if (lt == TRACEY_TYPE_LONG_LONG || rt == TRACEY_TYPE_LONG_LONG)
+                                return TRACEY_TYPE_LONG_LONG;
+                            if (lt == TRACEY_TYPE_LONG || rt == TRACEY_TYPE_LONG)
+                                return TRACEY_TYPE_LONG;
+                            return TRACEY_TYPE_INT;
+                        }
+                        tracey_semantic_error(sa, "Bitwise requires integer operands", e->loc);
+                        return TRACEY_TYPE_INT;
+                    case TRACEY_BINARY_SHIFT_LEFT:
+                    case TRACEY_BINARY_SHIFT_RIGHT:
+                        if (tracey_is_integer(lt) && tracey_is_integer(rt))
+                            return lt;
+                        tracey_semantic_error(sa, "Shift requires integer operands", e->loc);
+                        return TRACEY_TYPE_INT;
                     default:
                         return TRACEY_TYPE_INT;
                 }
@@ -454,6 +645,17 @@ static enum tracey_type_kind tracey_semantic_check_expr(struct tracey_semantic_a
                 return sym.type;
             }
         }
+        case TRACEY_EXPR_TERNARY:
+        {
+            enum tracey_type_kind ct = tracey_semantic_check_expr(sa, e->as.ternary_expr.condition, fn);
+            if (ct != TRACEY_TYPE_BOOL)
+                tracey_semantic_error(sa, "Ternary condition must be bool", e->loc);
+            enum tracey_type_kind tt = tracey_semantic_check_expr(sa, e->as.ternary_expr.then_branch, fn);
+            enum tracey_type_kind et = tracey_semantic_check_expr(sa, e->as.ternary_expr.else_branch, fn);
+            if (tt != et)
+                tracey_semantic_error(sa, "Ternary branches must have same type", e->loc);
+            return tt;
+        }
         default:
             return TRACEY_TYPE_VOID;
     }
@@ -487,7 +689,15 @@ static void tracey_semantic_check_stmt(struct tracey_semantic_analyzer *sa, stru
             if (s->as.var_decl_stmt.array_size > 0)
             {
                 if (vt == TRACEY_TYPE_INT) vt = TRACEY_TYPE_INT_PTR;
+                else if (vt == TRACEY_TYPE_UNSIGNED_INT) vt = TRACEY_TYPE_INT_PTR;
                 else if (vt == TRACEY_TYPE_CHAR) vt = TRACEY_TYPE_CHAR_PTR;
+                else if (vt == TRACEY_TYPE_SHORT) vt = TRACEY_TYPE_SHORT_PTR;
+                else if (vt == TRACEY_TYPE_UNSIGNED_SHORT) vt = TRACEY_TYPE_SHORT_PTR;
+                else if (vt == TRACEY_TYPE_LONG) vt = TRACEY_TYPE_LONG_PTR;
+                else if (vt == TRACEY_TYPE_UNSIGNED_LONG) vt = TRACEY_TYPE_LONG_PTR;
+                else if (vt == TRACEY_TYPE_LONG_LONG) vt = TRACEY_TYPE_LONG_LONG_PTR;
+                else if (vt == TRACEY_TYPE_UNSIGNED_LONG_LONG) vt = TRACEY_TYPE_LONG_LONG_PTR;
+                else if (vt == TRACEY_TYPE_SIZE_T) vt = TRACEY_TYPE_SIZE_T_PTR;
                 else if (vt == TRACEY_TYPE_FLOAT) vt = TRACEY_TYPE_FLOAT_PTR;
                 else if (vt == TRACEY_TYPE_DOUBLE) vt = TRACEY_TYPE_DOUBLE_PTR;
             }
@@ -499,7 +709,7 @@ static void tracey_semantic_check_stmt(struct tracey_semantic_analyzer *sa, stru
             if (s->as.var_decl_stmt.init)
             {
                 enum tracey_type_kind t = tracey_semantic_check_expr(sa, s->as.var_decl_stmt.init, fn);
-                if (t != vt)
+                if (!tracey_types_assignable(vt, t))
                     tracey_semantic_error(sa, "Type mismatch in initializer", s->loc);
             }
             return;
@@ -519,10 +729,12 @@ static void tracey_semantic_check_stmt(struct tracey_semantic_analyzer *sa, stru
         }
         case TRACEY_STMT_WHILE:
         {
+            sa->loop_depth++;
             enum tracey_type_kind t = tracey_semantic_check_expr(sa, s->as.while_stmt.condition, fn);
             if (t != TRACEY_TYPE_BOOL)
                 tracey_semantic_error(sa, "While condition must be bool", s->loc);
             tracey_semantic_check_stmt(sa, s->as.while_stmt.body, fn, expected_return);
+            sa->loop_depth--;
             return;
         }
         case TRACEY_STMT_RETURN:
@@ -538,6 +750,84 @@ static void tracey_semantic_check_stmt(struct tracey_semantic_analyzer *sa, stru
                     tracey_semantic_error(sa, "Expected return value", s->loc);
             }
             return;
+        case TRACEY_STMT_FOR:
+        {
+            sa->loop_depth++;
+            if (s->as.for_stmt.init)
+                tracey_semantic_check_stmt(sa, s->as.for_stmt.init, fn, expected_return);
+            if (s->as.for_stmt.condition)
+            {
+                enum tracey_type_kind t = tracey_semantic_check_expr(sa, s->as.for_stmt.condition, fn);
+                if (t != TRACEY_TYPE_BOOL)
+                    tracey_semantic_error(sa, "For condition must be bool", s->loc);
+            }
+            if (s->as.for_stmt.update)
+                (void)tracey_semantic_check_expr(sa, s->as.for_stmt.update, fn);
+            tracey_semantic_check_stmt(sa, s->as.for_stmt.body, fn, expected_return);
+            sa->loop_depth--;
+            return;
+        }
+        case TRACEY_STMT_BREAK:
+        case TRACEY_STMT_CONTINUE:
+            if (sa->loop_depth <= 0)
+                tracey_semantic_error(sa, "'break'/'continue' must be inside a loop", s->loc);
+            return;
+        case TRACEY_STMT_GOTO:
+        {
+            /* Forward-only goto within a function: record label usage. */
+            if (s->as.goto_stmt.label != NULL)
+            {
+                size_t j;
+                for (j = 0; j < sa->goto_label_count; j++)
+                {
+                    if (strcmp(sa->goto_labels[j], s->as.goto_stmt.label) == 0)
+                        break;
+                }
+                if (j == sa->goto_label_count)
+                {
+                    if (sa->goto_label_count == sa->goto_label_cap)
+                    {
+                        size_t new_cap = sa->goto_label_cap ? sa->goto_label_cap * 2 : 8;
+                        char **new_items = (char **)realloc(sa->goto_labels,
+                            new_cap * sizeof(*new_items));
+                        if (new_items == NULL) return;
+                        sa->goto_labels = new_items;
+                        sa->goto_label_cap = new_cap;
+                    }
+                    sa->goto_labels[sa->goto_label_count] = strdup(s->as.goto_stmt.label);
+                    sa->goto_label_count++;
+                }
+            }
+            return;
+        }
+        case TRACEY_STMT_LABEL:
+        {
+            if (s->as.label_stmt.label != NULL)
+            {
+                size_t j;
+                for (j = 0; j < sa->declared_label_count; j++)
+                {
+                    if (strcmp(sa->declared_labels[j], s->as.label_stmt.label) == 0)
+                        break;
+                }
+                if (j == sa->declared_label_count)
+                {
+                    if (sa->declared_label_count == sa->declared_label_cap)
+                    {
+                        size_t new_cap = sa->declared_label_cap ? sa->declared_label_cap * 2 : 8;
+                        char **new_items = (char **)realloc(sa->declared_labels,
+                            new_cap * sizeof(*new_items));
+                        if (new_items == NULL) { tracey_semantic_check_stmt(sa, s->as.label_stmt.stmt, fn, expected_return); return; }
+                        sa->declared_labels = new_items;
+                        sa->declared_label_cap = new_cap;
+                    }
+                    sa->declared_labels[sa->declared_label_count] = strdup(s->as.label_stmt.label);
+                    sa->declared_label_count++;
+                }
+            }
+            tracey_semantic_check_stmt(sa, s->as.label_stmt.stmt, fn, expected_return);
+            return;
+        }
         default:
             return;
     }
@@ -559,7 +849,59 @@ static void tracey_semantic_check_function(struct tracey_semantic_analyzer *sa,
         tracey_semantic_declare(sa, fn->params[i].name, sym, fn->loc);
     }
     if (fn->body)
+    {
+        /* Reset label tracking per function. */
+        tracey_semantic_string_array_free(sa->goto_labels, sa->goto_label_count);
+        sa->goto_labels = NULL;
+        sa->goto_label_count = 0;
+        sa->goto_label_cap = 0;
+        tracey_semantic_string_array_free(sa->declared_labels, sa->declared_label_count);
+        sa->declared_labels = NULL;
+        sa->declared_label_count = 0;
+        sa->declared_label_cap = 0;
+
         tracey_semantic_check_stmt(sa, fn->body, fn, fn->return_type);
+
+        /* Validate: every goto label must be declared, every declared label must be used. */
+        for (i = 0; i < sa->goto_label_count; i++)
+        {
+            size_t j;
+            bool found = false;
+            for (j = 0; j < sa->declared_label_count; j++)
+            {
+                if (strcmp(sa->goto_labels[i], sa->declared_labels[j]) == 0)
+                {
+                    found = true;
+                    break;
+                }
+            }
+            if (!found)
+            {
+                char buf[256];
+                snprintf(buf, sizeof(buf), "Goto label '%s' is not declared", sa->goto_labels[i]);
+                tracey_semantic_error(sa, buf, fn->loc);
+            }
+        }
+        for (i = 0; i < sa->declared_label_count; i++)
+        {
+            size_t j;
+            bool used = false;
+            for (j = 0; j < sa->goto_label_count; j++)
+            {
+                if (strcmp(sa->declared_labels[i], sa->goto_labels[j]) == 0)
+                {
+                    used = true;
+                    break;
+                }
+            }
+            if (!used)
+            {
+                char buf[256];
+                snprintf(buf, sizeof(buf), "Label '%s' is declared but not used", sa->declared_labels[i]);
+                tracey_semantic_error(sa, buf, fn->loc);
+            }
+        }
+    }
     tracey_semantic_pop_scope(sa);
 }
 
