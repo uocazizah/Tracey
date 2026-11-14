@@ -1,0 +1,14 @@
+// case_24.trc: multiple functions
+// expect_exit: 11
+int foo()
+{
+    return 5;
+}
+int bar()
+{
+    return 6;
+}
+int main()
+{
+    return foo() + bar();
+}
