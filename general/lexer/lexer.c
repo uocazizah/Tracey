@@ -33,7 +33,7 @@ static bool tracey_is_whitespace(char c)
 
 static bool tracey_is_valid_escape(char c)
 {
-    return c == 'n' || c == 't' || c == 'r' || c == '\\' || c == '"' || c == '0';
+    return c == 'n' || c == 't' || c == 'r' || c == '\\' || c == '"' || c == '0' || c == '\'';
 }
 
 struct tracey_keyword_entry
@@ -44,15 +44,24 @@ struct tracey_keyword_entry
 
 static const struct tracey_keyword_entry tracey_keywords[] = {
     {"bool", TRACEY_TOKEN_KEYWORD_BOOL},
+    {"break", TRACEY_TOKEN_KEYWORD_BREAK},
     {"char", TRACEY_TOKEN_KEYWORD_CHAR},
+    {"continue", TRACEY_TOKEN_KEYWORD_CONTINUE},
     {"double", TRACEY_TOKEN_KEYWORD_DOUBLE},
     {"else", TRACEY_TOKEN_KEYWORD_ELSE},
     {"false", TRACEY_TOKEN_KEYWORD_FALSE},
     {"float", TRACEY_TOKEN_KEYWORD_FLOAT},
+    {"for", TRACEY_TOKEN_KEYWORD_FOR},
+    {"goto", TRACEY_TOKEN_KEYWORD_GOTO},
     {"if", TRACEY_TOKEN_KEYWORD_IF},
     {"int", TRACEY_TOKEN_KEYWORD_INT},
+    {"long", TRACEY_TOKEN_KEYWORD_LONG},
     {"return", TRACEY_TOKEN_KEYWORD_RETURN},
+    {"short", TRACEY_TOKEN_KEYWORD_SHORT},
+    {"signed", TRACEY_TOKEN_KEYWORD_SIGNED},
+    {"size_t", TRACEY_TOKEN_KEYWORD_SIZE_T},
     {"true", TRACEY_TOKEN_KEYWORD_TRUE},
+    {"unsigned", TRACEY_TOKEN_KEYWORD_UNSIGNED},
     {"void", TRACEY_TOKEN_KEYWORD_VOID},
     {"while", TRACEY_TOKEN_KEYWORD_WHILE},
 };
@@ -216,10 +225,41 @@ static struct tracey_token tracey_scan_number(struct tracey_lexer *lexer, size_t
                                               size_t start_line, size_t start_column)
 {
     bool is_float = false;
+    bool is_hex = false;
+    bool is_bin = false;
     size_t length;
 
-    while (!tracey_lexer_at_end(lexer) && tracey_is_digit(tracey_lexer_current(lexer)))
+    /* Hexadecimal (0x) or binary (0b) prefix. The leading '0' was already
+     * consumed by the caller, so the current character is 'x'/'X'/'b'/'B'. */
+    if (!tracey_lexer_at_end(lexer))
+    {
+        char next = tracey_lexer_current(lexer);
+        if (next == 'x' || next == 'X')
+        {
+            is_hex = true;
+            tracey_lexer_advance(lexer); /* 'x' or 'X' */
+        }
+        else if (next == 'b' || next == 'B')
+        {
+            is_bin = true;
+            tracey_lexer_advance(lexer); /* 'b' or 'B' */
+        }
+    }
+
+    while (!tracey_lexer_at_end(lexer))
+    {
+        char c = tracey_lexer_current(lexer);
+        bool is_digit = tracey_is_digit(c);
+
+        if (is_hex)
+            is_digit = is_digit || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F');
+        else if (is_bin)
+            is_digit = (c == '0' || c == '1');
+
+        if (!is_digit)
+            break;
         tracey_lexer_advance(lexer);
+    }
 
     if (!tracey_lexer_at_end(lexer) && tracey_lexer_current(lexer) == '.')
     {
@@ -318,6 +358,60 @@ static struct tracey_token tracey_scan_string(struct tracey_lexer *lexer, size_t
                                    lexer->position - start_pos, start_line, start_column, lexer);
 }
 
+static struct tracey_token tracey_scan_char(struct tracey_lexer *lexer, size_t start_pos,
+                                            size_t start_line, size_t start_column)
+{
+    size_t bad_escape_pos = 0;
+    size_t bad_escape_line = 0;
+    size_t bad_escape_column = 0;
+    bool has_bad_escape = false;
+
+    while (!tracey_lexer_at_end(lexer))
+    {
+        char c = tracey_lexer_current(lexer);
+
+        if (c == '\'')
+        {
+            tracey_lexer_advance(lexer);
+            if (has_bad_escape)
+            {
+                return tracey_make_error_token(TRACEY_TOKEN_ERROR_INVALID_CHAR_ESCAPE,
+                                               bad_escape_pos, 2, bad_escape_line,
+                                               bad_escape_column, lexer);
+            }
+            return tracey_make_token(TRACEY_TOKEN_CHAR, start_pos, lexer->position - start_pos,
+                                     start_line, start_column, lexer);
+        }
+
+        if (c == '\n')
+            break;
+
+        if (c == '\\')
+        {
+            size_t escape_pos = lexer->position;
+            size_t escape_line = lexer->line;
+            size_t escape_column = lexer->column;
+            tracey_lexer_advance(lexer);
+            if (tracey_lexer_at_end(lexer) || tracey_lexer_current(lexer) == '\n')
+                break;
+            if (!has_bad_escape && !tracey_is_valid_escape(tracey_lexer_current(lexer)))
+            {
+                has_bad_escape = true;
+                bad_escape_pos = escape_pos;
+                bad_escape_line = escape_line;
+                bad_escape_column = escape_column;
+            }
+            tracey_lexer_advance(lexer);
+            continue;
+        }
+
+        tracey_lexer_advance(lexer);
+    }
+
+    return tracey_make_error_token(TRACEY_TOKEN_ERROR_UNTERMINATED_CHAR, start_pos,
+                                   lexer->position - start_pos, start_line, start_column, lexer);
+}
+
 static struct tracey_token tracey_scan_token(struct tracey_lexer *lexer)
 {
     size_t start_pos;
@@ -382,15 +476,30 @@ static struct tracey_token tracey_scan_token(struct tracey_lexer *lexer)
         case '.':
             return tracey_make_token(TRACEY_TOKEN_DOT, start_pos, 1, start_line, start_column, lexer);
         case '+':
-            return tracey_make_token(TRACEY_TOKEN_PLUS, start_pos, 1, start_line, start_column, lexer);
+            return tracey_make_token(tracey_lexer_match(lexer, '=') ? TRACEY_TOKEN_PLUS_EQUAL
+                                                                    : TRACEY_TOKEN_PLUS,
+                                     start_pos, lexer->position - start_pos, start_line,
+                                     start_column, lexer);
         case '-':
-            return tracey_make_token(TRACEY_TOKEN_MINUS, start_pos, 1, start_line, start_column, lexer);
+            return tracey_make_token(tracey_lexer_match(lexer, '=') ? TRACEY_TOKEN_MINUS_EQUAL
+                                                                    : TRACEY_TOKEN_MINUS,
+                                     start_pos, lexer->position - start_pos, start_line,
+                                     start_column, lexer);
         case '*':
-            return tracey_make_token(TRACEY_TOKEN_STAR, start_pos, 1, start_line, start_column, lexer);
+            return tracey_make_token(tracey_lexer_match(lexer, '=') ? TRACEY_TOKEN_STAR_EQUAL
+                                                                    : TRACEY_TOKEN_STAR,
+                                     start_pos, lexer->position - start_pos, start_line,
+                                     start_column, lexer);
         case '%':
-            return tracey_make_token(TRACEY_TOKEN_PERCENT, start_pos, 1, start_line, start_column, lexer);
+            return tracey_make_token(tracey_lexer_match(lexer, '=') ? TRACEY_TOKEN_PERCENT_EQUAL
+                                                                    : TRACEY_TOKEN_PERCENT,
+                                     start_pos, lexer->position - start_pos, start_line,
+                                     start_column, lexer);
         case '/':
-            return tracey_make_token(TRACEY_TOKEN_SLASH, start_pos, 1, start_line, start_column, lexer);
+            return tracey_make_token(tracey_lexer_match(lexer, '=') ? TRACEY_TOKEN_SLASH_EQUAL
+                                                                    : TRACEY_TOKEN_SLASH,
+                                     start_pos, lexer->position - start_pos, start_line,
+                                     start_column, lexer);
         case '=':
             return tracey_make_token(tracey_lexer_match(lexer, '=') ? TRACEY_TOKEN_EQUAL_EQUAL
                                                                     : TRACEY_TOKEN_ASSIGN,
@@ -402,11 +511,31 @@ static struct tracey_token tracey_scan_token(struct tracey_lexer *lexer)
                                      start_pos, lexer->position - start_pos, start_line,
                                      start_column, lexer);
         case '<':
+            if (tracey_lexer_match(lexer, '<'))
+            {
+                if (tracey_lexer_match(lexer, '='))
+                    return tracey_make_token(TRACEY_TOKEN_LESS_LESS_EQUAL,
+                                             start_pos, lexer->position - start_pos,
+                                             start_line, start_column, lexer);
+                return tracey_make_token(TRACEY_TOKEN_LESS_LESS,
+                                         start_pos, lexer->position - start_pos,
+                                         start_line, start_column, lexer);
+            }
             return tracey_make_token(tracey_lexer_match(lexer, '=') ? TRACEY_TOKEN_LESS_EQUAL
                                                                     : TRACEY_TOKEN_LESS,
                                      start_pos, lexer->position - start_pos, start_line,
                                      start_column, lexer);
         case '>':
+            if (tracey_lexer_match(lexer, '>'))
+            {
+                if (tracey_lexer_match(lexer, '='))
+                    return tracey_make_token(TRACEY_TOKEN_GREATER_GREATER_EQUAL,
+                                             start_pos, lexer->position - start_pos,
+                                             start_line, start_column, lexer);
+                return tracey_make_token(TRACEY_TOKEN_GREATER_GREATER,
+                                         start_pos, lexer->position - start_pos,
+                                         start_line, start_column, lexer);
+            }
             return tracey_make_token(tracey_lexer_match(lexer, '=') ? TRACEY_TOKEN_GREATER_EQUAL
                                                                     : TRACEY_TOKEN_GREATER,
                                      start_pos, lexer->position - start_pos, start_line,
@@ -415,12 +544,34 @@ static struct tracey_token tracey_scan_token(struct tracey_lexer *lexer)
             if (tracey_lexer_match(lexer, '&'))
                 return tracey_make_token(TRACEY_TOKEN_AMP_AMP, start_pos, lexer->position - start_pos,
                                          start_line, start_column, lexer);
+            if (tracey_lexer_match(lexer, '='))
+                return tracey_make_token(TRACEY_TOKEN_AMPERSAND_EQUAL,
+                                         start_pos, lexer->position - start_pos,
+                                         start_line, start_column, lexer);
             return tracey_make_token(TRACEY_TOKEN_AMPERSAND, start_pos, 1, start_line, start_column, lexer);
         case '|':
             if (tracey_lexer_match(lexer, '|'))
                 return tracey_make_token(TRACEY_TOKEN_PIPE_PIPE, start_pos, lexer->position - start_pos,
                                          start_line, start_column, lexer);
-            break;
+            if (tracey_lexer_match(lexer, '='))
+                return tracey_make_token(TRACEY_TOKEN_PIPE_EQUAL,
+                                         start_pos, lexer->position - start_pos,
+                                         start_line, start_column, lexer);
+            return tracey_make_token(TRACEY_TOKEN_PIPE, start_pos, 1, start_line, start_column, lexer);
+        case '^':
+            if (tracey_lexer_match(lexer, '='))
+                return tracey_make_token(TRACEY_TOKEN_CARET_EQUAL,
+                                         start_pos, lexer->position - start_pos,
+                                         start_line, start_column, lexer);
+            return tracey_make_token(TRACEY_TOKEN_CARET, start_pos, 1, start_line, start_column, lexer);
+        case '~':
+            return tracey_make_token(TRACEY_TOKEN_TILDE, start_pos, 1, start_line, start_column, lexer);
+        case '?':
+            return tracey_make_token(TRACEY_TOKEN_QUESTION, start_pos, 1, start_line, start_column, lexer);
+        case ':':
+            return tracey_make_token(TRACEY_TOKEN_COLON, start_pos, 1, start_line, start_column, lexer);
+        case '\'':
+            return tracey_scan_char(lexer, start_pos, start_line, start_column);
         case '"':
             return tracey_scan_string(lexer, start_pos, start_line, start_column);
         default:
@@ -517,6 +668,24 @@ const char *tracey_token_type_string(enum tracey_token_type type)
             return "KEYWORD_ELSE";
         case TRACEY_TOKEN_KEYWORD_WHILE:
             return "KEYWORD_WHILE";
+        case TRACEY_TOKEN_KEYWORD_FOR:
+            return "KEYWORD_FOR";
+        case TRACEY_TOKEN_KEYWORD_BREAK:
+            return "KEYWORD_BREAK";
+        case TRACEY_TOKEN_KEYWORD_CONTINUE:
+            return "KEYWORD_CONTINUE";
+        case TRACEY_TOKEN_KEYWORD_GOTO:
+            return "KEYWORD_GOTO";
+        case TRACEY_TOKEN_KEYWORD_LONG:
+            return "KEYWORD_LONG";
+        case TRACEY_TOKEN_KEYWORD_SHORT:
+            return "KEYWORD_SHORT";
+        case TRACEY_TOKEN_KEYWORD_UNSIGNED:
+            return "KEYWORD_UNSIGNED";
+        case TRACEY_TOKEN_KEYWORD_SIGNED:
+            return "KEYWORD_SIGNED";
+        case TRACEY_TOKEN_KEYWORD_SIZE_T:
+            return "KEYWORD_SIZE_T";
         case TRACEY_TOKEN_LPAREN:
             return "LPAREN";
         case TRACEY_TOKEN_RPAREN:
@@ -567,6 +736,44 @@ const char *tracey_token_type_string(enum tracey_token_type type)
             return "AMPERSAND";
         case TRACEY_TOKEN_PIPE_PIPE:
             return "PIPE_PIPE";
+        case TRACEY_TOKEN_PIPE:
+            return "PIPE";
+        case TRACEY_TOKEN_CARET:
+            return "CARET";
+        case TRACEY_TOKEN_TILDE:
+            return "TILDE";
+        case TRACEY_TOKEN_LESS_LESS:
+            return "LESS_LESS";
+        case TRACEY_TOKEN_GREATER_GREATER:
+            return "GREATER_GREATER";
+        case TRACEY_TOKEN_PLUS_EQUAL:
+            return "PLUS_EQUAL";
+        case TRACEY_TOKEN_MINUS_EQUAL:
+            return "MINUS_EQUAL";
+        case TRACEY_TOKEN_STAR_EQUAL:
+            return "STAR_EQUAL";
+        case TRACEY_TOKEN_SLASH_EQUAL:
+            return "SLASH_EQUAL";
+        case TRACEY_TOKEN_PERCENT_EQUAL:
+            return "PERCENT_EQUAL";
+        case TRACEY_TOKEN_LESS_LESS_EQUAL:
+            return "LESS_LESS_EQUAL";
+        case TRACEY_TOKEN_GREATER_GREATER_EQUAL:
+            return "GREATER_GREATER_EQUAL";
+        case TRACEY_TOKEN_AMPERSAND_EQUAL:
+            return "AMPERSAND_EQUAL";
+        case TRACEY_TOKEN_PIPE_EQUAL:
+            return "PIPE_EQUAL";
+        case TRACEY_TOKEN_CARET_EQUAL:
+            return "CARET_EQUAL";
+        case TRACEY_TOKEN_QUESTION:
+            return "QUESTION";
+        case TRACEY_TOKEN_COLON:
+            return "COLON";
+        case TRACEY_TOKEN_CHAR:
+            return "CHAR";
+        case TRACEY_TOKEN_DEFINED:
+            return "DEFINED";
         case TRACEY_TOKEN_ERROR:
             return "ERROR";
         default:
@@ -586,8 +793,12 @@ const char *tracey_token_error_string(enum tracey_token_error error)
             return "Invalid numeric literal suffix";
         case TRACEY_TOKEN_ERROR_INVALID_ESCAPE:
             return "Invalid escape sequence in string literal";
+        case TRACEY_TOKEN_ERROR_INVALID_CHAR_ESCAPE:
+            return "Invalid escape sequence in character literal";
         case TRACEY_TOKEN_ERROR_UNTERMINATED_STRING:
             return "Unterminated string literal";
+        case TRACEY_TOKEN_ERROR_UNTERMINATED_CHAR:
+            return "Unterminated character literal";
         case TRACEY_TOKEN_ERROR_UNTERMINATED_COMMENT:
             return "Unterminated block comment";
         default:
