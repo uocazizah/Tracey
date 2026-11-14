@@ -1,0 +1,10 @@
+// case_27.trc: void function call
+// expect_exit: 7
+void clear()
+{
+}
+int main()
+{
+    clear();
+    return 7;
+}
