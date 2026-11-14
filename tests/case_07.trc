@@ -1,0 +1,7 @@
+// case_07.trc: arithmetic * and /
+// expect_exit: 15
+int main()
+{
+    int a = 20 / 4 * 3;
+    return a;
+}
