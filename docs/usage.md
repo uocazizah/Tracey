@@ -1,37 +1,74 @@
 # Usage
 
-## Compile to assembly
+By default `traceyc` runs the whole pipeline and writes an executable.
+
+## Compile to an executable
 
 ```bash
-./build/traceyc input.trc -o output.s
+./build/traceyc input.trc -o output
+./output
+echo "exit=$?"
+```
+
+Without `-o`, the executable is named `a.out`.
+
+## Emit assembly instead
+
+```bash
+./build/traceyc input.trc -S -o output.s
 ```
 
 Without `-o`, assembly is printed to stdout.
 
-## Assemble
+## Verbose mode
 
 ```bash
-./build/traceyas output.s output.o
+./build/traceyc -V test.trc
 ```
 
-## Link
+## Multiple input files
 
 ```bash
-./build/traceyld program.elf output.o
-chmod +x program.elf
+./build/traceyc a.trc b.trc -o program
 ```
 
-## Run
+All inputs are compiled and their assembly is concatenated before linking.
+
+## Include paths and macros
 
 ```bash
-./program.elf
-echo "exit=$?"
+./build/traceyc test.trc -I include -D NAME=value -o test
 ```
 
-## Full pipeline example
+`-I` adds a search directory for `#include`. `-D` is accepted on the
+command line but is not yet applied to the preprocessor; define macros in
+source with `#define` instead.
+
+## Standard I/O
+
+Output:
+
+```trc
+print(...);                 // variadic; ints/chars use print_int,
+                            // char*/strings use print_str
+printf(fmt, ...);           // %d and %s in a literal format string
+```
+
+Input (stdin only):
+
+```trc
+int x = input_int();        // returns 0 on EOF or error
+char buf[32];
+input_str(buf, 32);        // reads a line, null-terminates, returns count
+print(buf);
+```
+
+## Manual toolchain
+
+If you want to drive the tools yourself:
 
 ```bash
-./build/traceyc test.trc -o test.s
+./build/traceyc test.trc -S -o test.s
 ./build/traceyas test.s test.o
 ./build/traceyld test.elf test.o
 chmod +x test.elf
@@ -39,33 +76,12 @@ chmod +x test.elf
 echo "exit=$?"
 ```
 
-## Using system toolchain (fallback)
+## Using the system toolchain
 
 ```bash
-./build/traceyc test.trc -o test.s
+./build/traceyc test.trc -S -o test.s
 gcc test.s -o test
 ./test
 ```
 
-## Verbose mode
-
-```bash
-./build/traceyc -v test.trc
-```
-
-## Standard I/O
-
-Output:
-
-```trc
-print(...);                 // variadic; int/char use print_int, char*/strings use print_str
-```
-
-Input (stdin only):
-
-```trc
-int x = input_int();        // returns 0 on EOF/error
-char buf[32];
-input_str(buf, 32);        // reads a line, null-terminates, returns count
-print(buf);
-```
+This only works on hosts where GCC can assemble AArch64.
