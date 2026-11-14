@@ -1,8 +1,21 @@
-Lexer test suite
+Test suite
+==========
 
-Tests are built together with the compiler (see Makefile) using the
-vendored doctest framework in ../dependencies/doctest. After building, run:
+The unit tests are built together with the compiler by `make`. They use the
+small C harness in `test/test_harness.h` (no external framework).
 
-    ctest --test-dir <build-dir> --output-on-failure
+Run all tests with:
 
-The lexer specification these tests encode lives in ../docs/lexer.md.
+    make test
+
+This builds and runs:
+
+- `build/tracey_lexer_test`
+- `build/tracey_source_test`
+- `build/tracey_argument_test`
+- `build/tracey_parser_test`
+- `build/tracey_semantic_test`
+
+and then the end-to-end language tests in `../tests/`.
+
+The lexer specification these tests encode lives in `../docs/lexer.md`.
