@@ -1,0 +1,14 @@
+// case_31.trc: blank lines in source (regression)
+// expect_exit: 15
+// Regression for the preprocessor bug where a blank line produced an
+// unterminated expansion buffer, causing the lexer to read garbage bytes.
+
+int main()
+{
+
+    int a = 5;
+
+    int b = 10;
+
+    return a + b;
+}
