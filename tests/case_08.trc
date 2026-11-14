@@ -1,0 +1,7 @@
+// case_08.trc: arithmetic % (modulo)
+// expect_exit: 2
+int main()
+{
+    int a = 17 % 5;
+    return a;
+}
