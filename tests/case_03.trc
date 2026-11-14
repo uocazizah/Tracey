@@ -1,0 +1,8 @@
+// case_03.trc: print string (stdlib)
+// expect_exit: 0
+// expect_stdout: hello
+int main()
+{
+    print("hello");
+    return 0;
+}
