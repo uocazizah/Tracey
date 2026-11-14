@@ -1,1 +1,5 @@
-runtime placeholder
+runtime
+=======
+
+Notes on the mini runtime. The actual runtime helpers (print, input, etc.)
+are emitted by `general/runtime/runtime.c` as part of code generation.
