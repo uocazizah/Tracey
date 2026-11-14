@@ -1,0 +1,10 @@
+// case_11.trc: comparison <
+// expect_exit: 1
+int main()
+{
+    int a = 3;
+    int b = 5;
+    if (a < b)
+        return 1;
+    return 0;
+}
