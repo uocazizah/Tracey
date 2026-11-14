@@ -1,0 +1,6 @@
+// case_02.trc: return arithmetic expression
+// expect_exit: 10
+int main()
+{
+    return 3 + 4 * 2 - 1;
+}
