@@ -1,0 +1,10 @@
+// case_20.trc: if / else-if
+// expect_exit: 2
+int main()
+{
+    if (false)
+        return 1;
+    else if (true)
+        return 2;
+    return 3;
+}
