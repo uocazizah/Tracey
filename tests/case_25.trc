@@ -1,0 +1,10 @@
+// case_25.trc: forward reference
+// expect_exit: 99
+int main()
+{
+    return later();
+}
+int later()
+{
+    return 99;
+}
