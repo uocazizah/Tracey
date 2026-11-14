@@ -1198,7 +1198,7 @@ static enum asm_encode_status asm_encode_line(struct asm_emit *e, const char *mn
         return ASM_ENCODE_OK;
     }
 
-    if (strcmp(mnemonic, "and") == 0 || strcmp(mnemonic, "orr") == 0)
+    if (strcmp(mnemonic, "and") == 0 || strcmp(mnemonic, "orr") == 0 || strcmp(mnemonic, "eor") == 0)
     {
         uint32_t base;
 
@@ -1209,7 +1209,8 @@ static enum asm_encode_status asm_encode_line(struct asm_emit *e, const char *mn
             !asm_parse_int(asm_slice_sub(ops[1], 1, ASM_NPOS), &rn) ||
             !asm_parse_int(asm_slice_sub(ops[2], 1, ASM_NPOS), &rm))
             return asm_fail_operands(e, mnemonic);
-        base = strcmp(mnemonic, "and") == 0 ? 0x8A000000u : 0xAA000000u;
+        base = strcmp(mnemonic, "and") == 0 ? 0x8A000000u :
+               strcmp(mnemonic, "orr") == 0 ? 0xAA000000u : 0xCA000000u;
         insn = base | (((uint32_t)rm & 0x1Fu) << 16) | (((uint32_t)rn & 0x1Fu) << 5) |
                ((uint32_t)rd & 0x1Fu);
         asm_emit_word(e, insn);
