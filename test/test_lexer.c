@@ -271,13 +271,20 @@ TEST_CASE(integer_with_letter_suffix_is_an_error)
     token_list_destroy(&tokens);
 }
 
-TEST_CASE(hex_literals_are_rejected_not_silently_split)
+TEST_CASE(hex_literals_are_lexed_as_integers)
 {
-    struct token_list tokens = lex_all("0x10");
+    struct token_list tokens = lex_all("0x10 0XFF 0b1010 0B1111");
 
-    REQUIRE(tokens.count == 2U);
-    CHECK_EQ(tokens.items[0].error, TRACEY_TOKEN_ERROR_INVALID_NUMBER_SUFFIX);
+    REQUIRE(tokens.count == 5U);
+    CHECK_EQ(tokens.items[0].type, TRACEY_TOKEN_INTEGER);
     CHECK(token_lexeme_is(&tokens.items[0], "0x10"));
+    CHECK_EQ(tokens.items[1].type, TRACEY_TOKEN_INTEGER);
+    CHECK(token_lexeme_is(&tokens.items[1], "0XFF"));
+    CHECK_EQ(tokens.items[2].type, TRACEY_TOKEN_INTEGER);
+    CHECK(token_lexeme_is(&tokens.items[2], "0b1010"));
+    CHECK_EQ(tokens.items[3].type, TRACEY_TOKEN_INTEGER);
+    CHECK(token_lexeme_is(&tokens.items[3], "0B1111"));
+    CHECK_EQ(tokens.items[4].type, TRACEY_TOKEN_EOF);
 
     token_list_destroy(&tokens);
 }
@@ -305,14 +312,15 @@ TEST_CASE(operators)
     CHECK_STR_EQ(dump_types("a||b"), "IDENTIFIER PIPE_PIPE IDENTIFIER EOF");
 }
 
-TEST_CASE(lone_pipe_is_an_error_ampersand_is_address_of)
+TEST_CASE(lone_pipe_is_bitwise_or_ampersand_is_address_of)
 {
     struct token_list tokens;
 
     CHECK_STR_EQ(dump_types("&"), "AMPERSAND EOF");
-    CHECK_STR_EQ(dump_types("|"), "ERROR EOF");
+    CHECK_STR_EQ(dump_types("|"), "PIPE EOF");
     CHECK_STR_EQ(dump_types("&&&"), "AMP_AMP AMPERSAND EOF");
     CHECK_STR_EQ(dump_types("&x"), "AMPERSAND IDENTIFIER EOF");
+    CHECK_STR_EQ(dump_types("|x"), "PIPE IDENTIFIER EOF");
 
     tokens = lex_all("a & b");
     REQUIRE(tokens.count == 4U);
@@ -566,10 +574,10 @@ TEST_MAIN_BEGIN("lexer")
     TEST_RUN(identifiers);
     TEST_RUN(integers);
     TEST_RUN(integer_with_letter_suffix_is_an_error);
-    TEST_RUN(hex_literals_are_rejected_not_silently_split);
+    TEST_RUN(hex_literals_are_lexed_as_integers);
     TEST_RUN(delimiters);
     TEST_RUN(operators);
-    TEST_RUN(lone_pipe_is_an_error_ampersand_is_address_of);
+    TEST_RUN(lone_pipe_is_bitwise_or_ampersand_is_address_of);
     TEST_RUN(line_comments);
     TEST_RUN(block_comments);
     TEST_RUN(unterminated_block_comment);
