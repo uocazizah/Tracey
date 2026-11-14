@@ -1,0 +1,10 @@
+// case_30.trc: multiple print calls (stdlib)
+// expect_exit: 0
+// expect_stdout: 123
+int main()
+{
+    print(1);
+    print(2);
+    print(3);
+    return 0;
+}
