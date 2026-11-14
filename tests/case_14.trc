@@ -1,0 +1,8 @@
+// case_14.trc: comparison >= (false)
+// expect_exit: 0
+int main()
+{
+    if (4 >= 5)
+        return 1;
+    return 0;
+}
