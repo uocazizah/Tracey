@@ -1,0 +1,8 @@
+// case_04.trc: print int (stdlib)
+// expect_exit: 0
+// expect_stdout: 123
+int main()
+{
+    print(123);
+    return 0;
+}
