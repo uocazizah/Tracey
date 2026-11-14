@@ -135,58 +135,124 @@ static void tracey_parser_synchronize(struct tracey_parser *parser)
 
 static enum tracey_type_kind tracey_parse_type(struct tracey_parser *parser)
 {
+    bool is_unsigned = false;
+    int long_count = 0;   /* 0 = none, 1 = long, 2 = long long */
+    bool is_short = false;
+
+    /* Parse optional sign/size qualifiers before the base type keyword. */
+    for (;;)
+    {
+        if (tracey_parser_check(parser, TRACEY_TOKEN_KEYWORD_UNSIGNED))
+        {
+            is_unsigned = true;
+            tracey_parser_advance(parser);
+            continue;
+        }
+        if (tracey_parser_check(parser, TRACEY_TOKEN_KEYWORD_SIGNED))
+        {
+            tracey_parser_advance(parser);
+            continue;
+        }
+        if (tracey_parser_check(parser, TRACEY_TOKEN_KEYWORD_LONG))
+        {
+            if (long_count < 2)
+            {
+                long_count++;
+                tracey_parser_advance(parser);
+                continue;
+            }
+            break;
+        }
+        if (tracey_parser_check(parser, TRACEY_TOKEN_KEYWORD_SHORT))
+        {
+            if (!is_short)
+            {
+                is_short = true;
+                tracey_parser_advance(parser);
+                continue;
+            }
+            break;
+        }
+        break;
+    }
+
+    /* Determine base type from the next keyword (defaults to int). */
+    enum tracey_type_kind base = TRACEY_TYPE_INT;
+
     if (tracey_parser_check(parser, TRACEY_TOKEN_KEYWORD_INT))
     {
         tracey_parser_advance(parser);
-        if (tracey_parser_check(parser, TRACEY_TOKEN_STAR))
-        {
-            tracey_parser_advance(parser);
-            return TRACEY_TYPE_INT_PTR;
-        }
-        return TRACEY_TYPE_INT;
+        base = TRACEY_TYPE_INT;
     }
-    if (tracey_parser_check(parser, TRACEY_TOKEN_KEYWORD_FLOAT))
+    else if (tracey_parser_check(parser, TRACEY_TOKEN_KEYWORD_CHAR))
     {
         tracey_parser_advance(parser);
-        if (tracey_parser_check(parser, TRACEY_TOKEN_STAR))
-        {
-            tracey_parser_advance(parser);
-            return TRACEY_TYPE_FLOAT_PTR;
-        }
-        return TRACEY_TYPE_FLOAT;
+        base = TRACEY_TYPE_CHAR;
     }
-    if (tracey_parser_check(parser, TRACEY_TOKEN_KEYWORD_DOUBLE))
+    else if (tracey_parser_check(parser, TRACEY_TOKEN_KEYWORD_FLOAT))
     {
         tracey_parser_advance(parser);
-        if (tracey_parser_check(parser, TRACEY_TOKEN_STAR))
-        {
-            tracey_parser_advance(parser);
-            return TRACEY_TYPE_DOUBLE_PTR;
-        }
-        return TRACEY_TYPE_DOUBLE;
+        base = TRACEY_TYPE_FLOAT;
     }
-    if (tracey_parser_check(parser, TRACEY_TOKEN_KEYWORD_BOOL))
+    else if (tracey_parser_check(parser, TRACEY_TOKEN_KEYWORD_DOUBLE))
     {
         tracey_parser_advance(parser);
-        return TRACEY_TYPE_BOOL;
+        base = TRACEY_TYPE_DOUBLE;
     }
-    if (tracey_parser_check(parser, TRACEY_TOKEN_KEYWORD_VOID))
+    else if (tracey_parser_check(parser, TRACEY_TOKEN_KEYWORD_BOOL))
     {
         tracey_parser_advance(parser);
-        return TRACEY_TYPE_VOID;
+        base = TRACEY_TYPE_BOOL;
     }
-    if (tracey_parser_check(parser, TRACEY_TOKEN_KEYWORD_CHAR))
+    else if (tracey_parser_check(parser, TRACEY_TOKEN_KEYWORD_VOID))
     {
         tracey_parser_advance(parser);
-        if (tracey_parser_check(parser, TRACEY_TOKEN_STAR))
-        {
-            tracey_parser_advance(parser);
-            return TRACEY_TYPE_CHAR_PTR;
-        }
-        return TRACEY_TYPE_CHAR;
+        base = TRACEY_TYPE_VOID;
     }
-    tracey_parser_error(parser, "Expected type", &parser->current);
-    return TRACEY_TYPE_INT;
+    else if (tracey_parser_check(parser, TRACEY_TOKEN_KEYWORD_SIZE_T))
+    {
+        tracey_parser_advance(parser);
+        base = TRACEY_TYPE_SIZE_T;
+    }
+
+    /* Handle pointer suffix. */
+    bool is_pointer = false;
+    if (tracey_parser_check(parser, TRACEY_TOKEN_STAR))
+    {
+        tracey_parser_advance(parser);
+        is_pointer = true;
+    }
+
+    /* Compute final scalar type. */
+    if (!is_pointer)
+    {
+        if (long_count == 2)
+            return is_unsigned ? TRACEY_TYPE_UNSIGNED_LONG_LONG : TRACEY_TYPE_LONG_LONG;
+        if (long_count == 1)
+            return is_unsigned ? TRACEY_TYPE_UNSIGNED_LONG : TRACEY_TYPE_LONG;
+        if (is_short)
+            return is_unsigned ? TRACEY_TYPE_UNSIGNED_SHORT : TRACEY_TYPE_SHORT;
+        if (is_unsigned)
+            return TRACEY_TYPE_UNSIGNED_INT;
+        return base;
+    }
+
+    /* Compute final pointer type. */
+    if (long_count == 2)
+        return TRACEY_TYPE_LONG_LONG_PTR;
+    if (long_count == 1)
+        return TRACEY_TYPE_LONG_PTR;
+    if (is_short)
+        return TRACEY_TYPE_SHORT_PTR;
+    switch (base)
+    {
+        case TRACEY_TYPE_INT:      return TRACEY_TYPE_INT_PTR;
+        case TRACEY_TYPE_CHAR:     return TRACEY_TYPE_CHAR_PTR;
+        case TRACEY_TYPE_FLOAT:    return TRACEY_TYPE_FLOAT_PTR;
+        case TRACEY_TYPE_DOUBLE:   return TRACEY_TYPE_DOUBLE_PTR;
+        case TRACEY_TYPE_SIZE_T:   return TRACEY_TYPE_SIZE_T_PTR;
+        default:                   return TRACEY_TYPE_INT_PTR;
+    }
 }
 
 static bool tracey_program_push_function(struct tracey_program *program, struct tracey_function_decl *fn)
@@ -204,11 +270,19 @@ static bool tracey_program_push_function(struct tracey_program *program, struct 
 static struct tracey_expr *tracey_parse_expression(struct tracey_parser *parser);
 static struct tracey_stmt *tracey_parse_statement(struct tracey_parser *parser);
 static struct tracey_stmt *tracey_parse_block(struct tracey_parser *parser);
+static struct tracey_stmt *tracey_parse_for(struct tracey_parser *parser);
+static struct tracey_stmt *tracey_parse_break(struct tracey_parser *parser);
+static struct tracey_stmt *tracey_parse_continue(struct tracey_parser *parser);
+static struct tracey_stmt *tracey_parse_goto(struct tracey_parser *parser);
 
 /* Forward declarations for expression precedence */
 static struct tracey_expr *tracey_parse_assignment(struct tracey_parser *parser);
+static struct tracey_expr *tracey_parse_ternary(struct tracey_parser *parser);
 static struct tracey_expr *tracey_parse_logical_or(struct tracey_parser *parser);
 static struct tracey_expr *tracey_parse_logical_and(struct tracey_parser *parser);
+static struct tracey_expr *tracey_parse_bitwise_or(struct tracey_parser *parser);
+static struct tracey_expr *tracey_parse_bitwise_xor(struct tracey_parser *parser);
+static struct tracey_expr *tracey_parse_bitwise_and(struct tracey_parser *parser);
 static struct tracey_expr *tracey_parse_equality(struct tracey_parser *parser);
 static struct tracey_expr *tracey_parse_relational(struct tracey_parser *parser);
 static struct tracey_expr *tracey_parse_additive(struct tracey_parser *parser);
@@ -328,6 +402,44 @@ static struct tracey_expr *tracey_parse_primary(struct tracey_parser *parser)
             return e;
         }
     }
+    if (tracey_parser_check(parser, TRACEY_TOKEN_CHAR))
+    {
+        struct tracey_token tok = parser->current;
+        tracey_parser_advance(parser);
+        {
+            struct tracey_expr *e = tracey_expr_create(TRACEY_EXPR_CHAR, (struct tracey_source_loc){tok.line, tok.column});
+            if (e)
+            {
+                /* Decode the char literal: lexeme is like 'a' or '\n'. */
+                const char *lex = tok.lexeme;
+                size_t len = tok.lexeme_len;
+                int v = 0;
+                if (len >= 3 && lex[0] == '\'' && lex[len - 1] == '\'')
+                {
+                    if (lex[1] == '\\' && len >= 4)
+                    {
+                        switch (lex[2])
+                        {
+                            case 'n': v = '\n'; break;
+                            case 't': v = '\t'; break;
+                            case 'r': v = '\r'; break;
+                            case '0': v = '\0'; break;
+                            case '\\': v = '\\'; break;
+                            case '\'': v = '\''; break;
+                            case '"': v = '"'; break;
+                            default: v = (unsigned char)lex[2]; break;
+                        }
+                    }
+                    else
+                    {
+                        v = (unsigned char)lex[1];
+                    }
+                }
+                e->as.char_expr.value = v;
+            }
+            return e;
+        }
+    }
     if (tracey_parser_check(parser, TRACEY_TOKEN_IDENTIFIER))
     {
         struct tracey_token tok = parser->current;
@@ -421,6 +533,19 @@ static struct tracey_expr *tracey_parse_unary(struct tracey_parser *parser)
         e = tracey_expr_create(TRACEY_EXPR_UNARY, loc);
         if (!e) { tracey_expr_destroy(opnd); return NULL; }
         e->as.unary_expr.op = TRACEY_UNARY_LOG_NOT;
+        e->as.unary_expr.operand = opnd;
+        return e;
+    }
+    if (tracey_parser_check(parser, TRACEY_TOKEN_TILDE))
+    {
+        struct tracey_source_loc loc = {parser->current.line, parser->current.column};
+        struct tracey_expr *opnd, *e;
+        tracey_parser_advance(parser);
+        opnd = tracey_parse_unary(parser);
+        if (!opnd) return NULL;
+        e = tracey_expr_create(TRACEY_EXPR_UNARY, loc);
+        if (!e) { tracey_expr_destroy(opnd); return NULL; }
+        e->as.unary_expr.op = TRACEY_UNARY_BIT_NOT;
         e->as.unary_expr.operand = opnd;
         return e;
     }
@@ -564,15 +689,63 @@ static struct tracey_expr *tracey_parse_equality(struct tracey_parser *parser)
 
 static struct tracey_expr *tracey_parse_logical_and(struct tracey_parser *parser)
 {
-    struct tracey_expr *left = tracey_parse_equality(parser);
+    struct tracey_expr *left = tracey_parse_bitwise_or(parser);
     if (!left) return NULL;
     while (tracey_parser_check(parser, TRACEY_TOKEN_AMP_AMP))
     {
         struct tracey_expr *right;
         tracey_parser_advance(parser);
-        right = tracey_parse_equality(parser);
+        right = tracey_parse_bitwise_or(parser);
         if (!right) { tracey_expr_destroy(left); return NULL; }
         left = tracey_make_binary(left, TRACEY_BINARY_LOG_AND, right);
+        if (!left) return NULL;
+    }
+    return left;
+}
+
+static struct tracey_expr *tracey_parse_bitwise_or(struct tracey_parser *parser)
+{
+    struct tracey_expr *left = tracey_parse_bitwise_xor(parser);
+    if (!left) return NULL;
+    while (tracey_parser_check(parser, TRACEY_TOKEN_PIPE))
+    {
+        struct tracey_expr *right;
+        tracey_parser_advance(parser);
+        right = tracey_parse_bitwise_xor(parser);
+        if (!right) { tracey_expr_destroy(left); return NULL; }
+        left = tracey_make_binary(left, TRACEY_BINARY_BIT_OR, right);
+        if (!left) return NULL;
+    }
+    return left;
+}
+
+static struct tracey_expr *tracey_parse_bitwise_xor(struct tracey_parser *parser)
+{
+    struct tracey_expr *left = tracey_parse_bitwise_and(parser);
+    if (!left) return NULL;
+    while (tracey_parser_check(parser, TRACEY_TOKEN_CARET))
+    {
+        struct tracey_expr *right;
+        tracey_parser_advance(parser);
+        right = tracey_parse_bitwise_and(parser);
+        if (!right) { tracey_expr_destroy(left); return NULL; }
+        left = tracey_make_binary(left, TRACEY_BINARY_BIT_XOR, right);
+        if (!left) return NULL;
+    }
+    return left;
+}
+
+static struct tracey_expr *tracey_parse_bitwise_and(struct tracey_parser *parser)
+{
+    struct tracey_expr *left = tracey_parse_equality(parser);
+    if (!left) return NULL;
+    while (tracey_parser_check(parser, TRACEY_TOKEN_AMPERSAND))
+    {
+        struct tracey_expr *right;
+        tracey_parser_advance(parser);
+        right = tracey_parse_equality(parser);
+        if (!right) { tracey_expr_destroy(left); return NULL; }
+        left = tracey_make_binary(left, TRACEY_BINARY_BIT_AND, right);
         if (!left) return NULL;
     }
     return left;
@@ -602,7 +775,7 @@ static bool tracey_is_assignable(const struct tracey_expr *e)
 
 static struct tracey_expr *tracey_parse_assignment(struct tracey_parser *parser)
 {
-    struct tracey_expr *left = tracey_parse_logical_or(parser);
+    struct tracey_expr *left = tracey_parse_ternary(parser);
     if (!left) return NULL;
     if (tracey_parser_check(parser, TRACEY_TOKEN_ASSIGN) && tracey_is_assignable(left))
     {
@@ -612,7 +785,140 @@ static struct tracey_expr *tracey_parse_assignment(struct tracey_parser *parser)
         if (!right) { tracey_expr_destroy(left); return NULL; }
         left = tracey_make_binary(left, TRACEY_BINARY_ASSIGN, right);
     }
+    else if (tracey_parser_check(parser, TRACEY_TOKEN_PLUS_EQUAL) &&
+             tracey_is_assignable(left))
+    {
+        struct tracey_expr *right;
+        tracey_parser_advance(parser);
+        right = tracey_parse_assignment(parser);
+        if (!right) { tracey_expr_destroy(left); return NULL; }
+        left = tracey_make_binary(left, TRACEY_BINARY_ADD_ASSIGN, right);
+    }
+    else if (tracey_parser_check(parser, TRACEY_TOKEN_MINUS_EQUAL) &&
+             tracey_is_assignable(left))
+    {
+        struct tracey_expr *right;
+        tracey_parser_advance(parser);
+        right = tracey_parse_assignment(parser);
+        if (!right) { tracey_expr_destroy(left); return NULL; }
+        left = tracey_make_binary(left, TRACEY_BINARY_SUB_ASSIGN, right);
+    }
+    else if (tracey_parser_check(parser, TRACEY_TOKEN_STAR_EQUAL) &&
+             tracey_is_assignable(left))
+    {
+        struct tracey_expr *right;
+        tracey_parser_advance(parser);
+        right = tracey_parse_assignment(parser);
+        if (!right) { tracey_expr_destroy(left); return NULL; }
+        left = tracey_make_binary(left, TRACEY_BINARY_MUL_ASSIGN, right);
+    }
+    else if (tracey_parser_check(parser, TRACEY_TOKEN_SLASH_EQUAL) &&
+             tracey_is_assignable(left))
+    {
+        struct tracey_expr *right;
+        tracey_parser_advance(parser);
+        right = tracey_parse_assignment(parser);
+        if (!right) { tracey_expr_destroy(left); return NULL; }
+        left = tracey_make_binary(left, TRACEY_BINARY_DIV_ASSIGN, right);
+    }
+    else if (tracey_parser_check(parser, TRACEY_TOKEN_PERCENT_EQUAL) &&
+             tracey_is_assignable(left))
+    {
+        struct tracey_expr *right;
+        tracey_parser_advance(parser);
+        right = tracey_parse_assignment(parser);
+        if (!right) { tracey_expr_destroy(left); return NULL; }
+        left = tracey_make_binary(left, TRACEY_BINARY_MOD_ASSIGN, right);
+    }
+    else if (tracey_parser_check(parser, TRACEY_TOKEN_LESS_LESS_EQUAL) &&
+             tracey_is_assignable(left))
+    {
+        struct tracey_expr *right;
+        tracey_parser_advance(parser);
+        right = tracey_parse_assignment(parser);
+        if (!right) { tracey_expr_destroy(left); return NULL; }
+        left = tracey_make_binary(left, TRACEY_BINARY_SHL_ASSIGN, right);
+    }
+    else if (tracey_parser_check(parser, TRACEY_TOKEN_GREATER_GREATER_EQUAL) &&
+             tracey_is_assignable(left))
+    {
+        struct tracey_expr *right;
+        tracey_parser_advance(parser);
+        right = tracey_parse_assignment(parser);
+        if (!right) { tracey_expr_destroy(left); return NULL; }
+        left = tracey_make_binary(left, TRACEY_BINARY_SHR_ASSIGN, right);
+    }
+    else if (tracey_parser_check(parser, TRACEY_TOKEN_AMPERSAND_EQUAL) &&
+             tracey_is_assignable(left))
+    {
+        struct tracey_expr *right;
+        tracey_parser_advance(parser);
+        right = tracey_parse_assignment(parser);
+        if (!right) { tracey_expr_destroy(left); return NULL; }
+        left = tracey_make_binary(left, TRACEY_BINARY_AND_ASSIGN, right);
+    }
+    else if (tracey_parser_check(parser, TRACEY_TOKEN_PIPE_EQUAL) &&
+             tracey_is_assignable(left))
+    {
+        struct tracey_expr *right;
+        tracey_parser_advance(parser);
+        right = tracey_parse_assignment(parser);
+        if (!right) { tracey_expr_destroy(left); return NULL; }
+        left = tracey_make_binary(left, TRACEY_BINARY_OR_ASSIGN, right);
+    }
+    else if (tracey_parser_check(parser, TRACEY_TOKEN_CARET_EQUAL) &&
+             tracey_is_assignable(left))
+    {
+        struct tracey_expr *right;
+        tracey_parser_advance(parser);
+        right = tracey_parse_assignment(parser);
+        if (!right) { tracey_expr_destroy(left); return NULL; }
+        left = tracey_make_binary(left, TRACEY_BINARY_XOR_ASSIGN, right);
+    }
     return left;
+}
+
+static struct tracey_expr *tracey_parse_ternary(struct tracey_parser *parser)
+{
+    struct tracey_expr *cond = tracey_parse_logical_or(parser);
+    if (!cond) return NULL;
+    if (tracey_parser_match(parser, TRACEY_TOKEN_QUESTION))
+    {
+        struct tracey_expr *then_branch = tracey_parse_expression(parser);
+        if (!then_branch)
+        {
+            tracey_expr_destroy(cond);
+            return NULL;
+        }
+        if (!tracey_parser_expect(parser, TRACEY_TOKEN_COLON, "expected ':'"))
+        {
+            tracey_expr_destroy(cond);
+            tracey_expr_destroy(then_branch);
+            return NULL;
+        }
+        struct tracey_expr *else_branch = tracey_parse_expression(parser);
+        if (!else_branch)
+        {
+            tracey_expr_destroy(cond);
+            tracey_expr_destroy(then_branch);
+            return NULL;
+        }
+        {
+            struct tracey_expr *e = tracey_expr_create(TRACEY_EXPR_TERNARY, cond->loc);
+            if (!e)
+            {
+                tracey_expr_destroy(cond);
+                tracey_expr_destroy(then_branch);
+                tracey_expr_destroy(else_branch);
+                return NULL;
+            }
+            e->as.ternary_expr.condition = cond;
+            e->as.ternary_expr.then_branch = then_branch;
+            e->as.ternary_expr.else_branch = else_branch;
+            return e;
+        }
+    }
+    return cond;
 }
 
 static bool tracey_block_push(struct tracey_block_stmt *block, struct tracey_stmt *stmt)
@@ -694,6 +1000,161 @@ fail:
     return NULL;
 }
 
+static struct tracey_stmt *tracey_parse_var_decl_as_stmt(struct tracey_parser *parser)
+{
+    enum tracey_type_kind t = tracey_parse_type(parser);
+    struct tracey_token name_tok;
+    struct tracey_stmt *vd;
+
+    if (!tracey_parser_check(parser, TRACEY_TOKEN_IDENTIFIER))
+    {
+        tracey_parser_error(parser, "Expected variable name", &parser->current);
+        return NULL;
+    }
+    name_tok = parser->current;
+    vd = tracey_stmt_create(TRACEY_STMT_VAR_DECL,
+        (struct tracey_source_loc){name_tok.line, name_tok.column});
+    if (!vd) return NULL;
+    vd->as.var_decl_stmt.type = t;
+    vd->as.var_decl_stmt.name = tracey_token_strdup(&name_tok);
+    tracey_parser_advance(parser);
+    if (tracey_parser_check(parser, TRACEY_TOKEN_LBRACKET))
+    {
+        tracey_parser_advance(parser);
+        if (tracey_parser_check(parser, TRACEY_TOKEN_INTEGER))
+        {
+            size_t i; size_t sz = 0;
+            for (i = 0; i < parser->current.lexeme_len; i++)
+                sz = sz * 10 + (size_t)(parser->current.lexeme[i] - '0');
+            vd->as.var_decl_stmt.array_size = sz;
+            tracey_parser_advance(parser);
+        }
+        if (!tracey_parser_expect(parser, TRACEY_TOKEN_RBRACKET, "expected ']'"))
+        { tracey_stmt_destroy(vd); return NULL; }
+    }
+    if (tracey_parser_match(parser, TRACEY_TOKEN_ASSIGN))
+    {
+        vd->as.var_decl_stmt.init = tracey_parse_expression(parser);
+        if (!vd->as.var_decl_stmt.init) { tracey_stmt_destroy(vd); return NULL; }
+    }
+    return vd;
+}
+
+static struct tracey_stmt *tracey_parse_for(struct tracey_parser *parser)
+{
+    struct tracey_source_loc loc = {parser->current.line, parser->current.column};
+    struct tracey_stmt *s = tracey_stmt_create(TRACEY_STMT_FOR, loc);
+    if (!s) return NULL;
+    tracey_parser_advance(parser);
+    if (!tracey_parser_expect(parser, TRACEY_TOKEN_LPAREN, "expected '('")) goto fail;
+
+    /* init: variable declaration or expression statement (optional) */
+    if (tracey_parser_check(parser, TRACEY_TOKEN_SEMICOLON))
+    {
+        s->as.for_stmt.init = NULL;
+    }
+    else if (tracey_parser_check(parser, TRACEY_TOKEN_KEYWORD_INT) ||
+             tracey_parser_check(parser, TRACEY_TOKEN_KEYWORD_BOOL) ||
+             tracey_parser_check(parser, TRACEY_TOKEN_KEYWORD_CHAR) ||
+             tracey_parser_check(parser, TRACEY_TOKEN_KEYWORD_LONG) ||
+             tracey_parser_check(parser, TRACEY_TOKEN_KEYWORD_SHORT) ||
+             tracey_parser_check(parser, TRACEY_TOKEN_KEYWORD_UNSIGNED) ||
+             tracey_parser_check(parser, TRACEY_TOKEN_KEYWORD_SIGNED) ||
+             tracey_parser_check(parser, TRACEY_TOKEN_KEYWORD_FLOAT) ||
+             tracey_parser_check(parser, TRACEY_TOKEN_KEYWORD_DOUBLE) ||
+             tracey_parser_check(parser, TRACEY_TOKEN_KEYWORD_VOID) ||
+             tracey_parser_check(parser, TRACEY_TOKEN_KEYWORD_SIZE_T))
+    {
+        s->as.for_stmt.init = tracey_parse_var_decl_as_stmt(parser);
+        if (!s->as.for_stmt.init) goto fail;
+    }
+    else
+    {
+        struct tracey_expr *e = tracey_parse_expression(parser);
+        if (!e) goto fail;
+        s->as.for_stmt.init = tracey_stmt_create(TRACEY_STMT_EXPR, e->loc);
+        if (!s->as.for_stmt.init) { tracey_expr_destroy(e); goto fail; }
+        s->as.for_stmt.init->as.expr_stmt.expression = e;
+    }
+
+    if (!tracey_parser_expect(parser, TRACEY_TOKEN_SEMICOLON, "expected ';' after for init")) goto fail;
+
+    /* condition (optional) */
+    if (tracey_parser_check(parser, TRACEY_TOKEN_SEMICOLON))
+    {
+        s->as.for_stmt.condition = NULL;
+    }
+    else
+    {
+        s->as.for_stmt.condition = tracey_parse_expression(parser);
+        if (!s->as.for_stmt.condition) goto fail;
+        if (!tracey_parser_expect(parser, TRACEY_TOKEN_SEMICOLON, "expected ';' after for condition")) goto fail;
+    }
+
+    /* update (optional) */
+    if (tracey_parser_check(parser, TRACEY_TOKEN_RPAREN))
+    {
+        s->as.for_stmt.update = NULL;
+    }
+    else
+    {
+        s->as.for_stmt.update = tracey_parse_expression(parser);
+        if (!s->as.for_stmt.update) goto fail;
+    }
+
+    if (!tracey_parser_expect(parser, TRACEY_TOKEN_RPAREN, "expected ')' after for update")) goto fail;
+
+    s->as.for_stmt.body = tracey_parse_statement(parser);
+    if (!s->as.for_stmt.body) goto fail;
+    return s;
+fail:
+    tracey_stmt_destroy(s);
+    return NULL;
+}
+
+static struct tracey_stmt *tracey_parse_break(struct tracey_parser *parser)
+{
+    struct tracey_source_loc loc = {parser->current.line, parser->current.column};
+    struct tracey_stmt *s = tracey_stmt_create(TRACEY_STMT_BREAK, loc);
+    if (!s) return NULL;
+    tracey_parser_advance(parser);
+    if (!tracey_parser_expect(parser, TRACEY_TOKEN_SEMICOLON, "expected ';'")) { tracey_stmt_destroy(s); return NULL; }
+    return s;
+}
+
+static struct tracey_stmt *tracey_parse_continue(struct tracey_parser *parser)
+{
+    struct tracey_source_loc loc = {parser->current.line, parser->current.column};
+    struct tracey_stmt *s = tracey_stmt_create(TRACEY_STMT_CONTINUE, loc);
+    if (!s) return NULL;
+    tracey_parser_advance(parser);
+    if (!tracey_parser_expect(parser, TRACEY_TOKEN_SEMICOLON, "expected ';'")) { tracey_stmt_destroy(s); return NULL; }
+    return s;
+}
+
+static struct tracey_stmt *tracey_parse_goto(struct tracey_parser *parser)
+{
+    struct tracey_source_loc loc = {parser->current.line, parser->current.column};
+    struct tracey_stmt *s = tracey_stmt_create(TRACEY_STMT_GOTO, loc);
+    if (!s) return NULL;
+    tracey_parser_advance(parser);
+    if (!tracey_parser_check(parser, TRACEY_TOKEN_IDENTIFIER))
+    {
+        tracey_stmt_destroy(s);
+        tracey_parser_error(parser, "Expected label name after 'goto'", &parser->current);
+        return NULL;
+    }
+    s->as.goto_stmt.label = tracey_token_strdup(&parser->current);
+    tracey_parser_advance(parser);
+    if (!tracey_parser_expect(parser, TRACEY_TOKEN_SEMICOLON, "expected ';'"))
+    {
+        free(s->as.goto_stmt.label);
+        tracey_stmt_destroy(s);
+        return NULL;
+    }
+    return s;
+}
+
 static struct tracey_stmt *tracey_parse_return(struct tracey_parser *parser)
 {
     struct tracey_source_loc loc = {parser->current.line, parser->current.column};
@@ -714,12 +1175,41 @@ fail:
 
 static struct tracey_stmt *tracey_parse_statement(struct tracey_parser *parser)
 {
+    /* Label: identifier: statement */
+    if (tracey_parser_check(parser, TRACEY_TOKEN_IDENTIFIER))
+    {
+        struct tracey_token next = tracey_lexer_peek(parser->lexer);
+        if (next.type == TRACEY_TOKEN_COLON)
+        {
+            struct tracey_token name_tok = parser->current;
+            tracey_parser_advance(parser); /* consume identifier */
+            tracey_parser_advance(parser); /* consume ':' */
+            {
+                struct tracey_stmt *s = tracey_stmt_create(TRACEY_STMT_LABEL,
+                    (struct tracey_source_loc){name_tok.line, name_tok.column});
+                if (!s) return NULL;
+                s->as.label_stmt.label = tracey_token_strdup(&name_tok);
+                s->as.label_stmt.stmt = tracey_parse_statement(parser);
+                if (!s->as.label_stmt.stmt) { tracey_stmt_destroy(s); return NULL; }
+                return s;
+            }
+        }
+    }
+
     if (tracey_parser_check(parser, TRACEY_TOKEN_LBRACE))
         return tracey_parse_block(parser);
     if (tracey_parser_check(parser, TRACEY_TOKEN_KEYWORD_IF))
         return tracey_parse_if(parser);
     if (tracey_parser_check(parser, TRACEY_TOKEN_KEYWORD_WHILE))
         return tracey_parse_while(parser);
+    if (tracey_parser_check(parser, TRACEY_TOKEN_KEYWORD_FOR))
+        return tracey_parse_for(parser);
+    if (tracey_parser_check(parser, TRACEY_TOKEN_KEYWORD_BREAK))
+        return tracey_parse_break(parser);
+    if (tracey_parser_check(parser, TRACEY_TOKEN_KEYWORD_CONTINUE))
+        return tracey_parse_continue(parser);
+    if (tracey_parser_check(parser, TRACEY_TOKEN_KEYWORD_GOTO))
+        return tracey_parse_goto(parser);
     if (tracey_parser_check(parser, TRACEY_TOKEN_KEYWORD_RETURN))
         return tracey_parse_return(parser);
     if (tracey_parser_check(parser, TRACEY_TOKEN_KEYWORD_INT) ||
@@ -727,7 +1217,12 @@ static struct tracey_stmt *tracey_parse_statement(struct tracey_parser *parser)
         tracey_parser_check(parser, TRACEY_TOKEN_KEYWORD_VOID) ||
         tracey_parser_check(parser, TRACEY_TOKEN_KEYWORD_CHAR) ||
         tracey_parser_check(parser, TRACEY_TOKEN_KEYWORD_FLOAT) ||
-        tracey_parser_check(parser, TRACEY_TOKEN_KEYWORD_DOUBLE))
+        tracey_parser_check(parser, TRACEY_TOKEN_KEYWORD_DOUBLE) ||
+        tracey_parser_check(parser, TRACEY_TOKEN_KEYWORD_LONG) ||
+        tracey_parser_check(parser, TRACEY_TOKEN_KEYWORD_SHORT) ||
+        tracey_parser_check(parser, TRACEY_TOKEN_KEYWORD_UNSIGNED) ||
+        tracey_parser_check(parser, TRACEY_TOKEN_KEYWORD_SIGNED) ||
+        tracey_parser_check(parser, TRACEY_TOKEN_KEYWORD_SIZE_T))
     {
         enum tracey_type_kind t = tracey_parse_type(parser);
         struct tracey_token name_tok;
