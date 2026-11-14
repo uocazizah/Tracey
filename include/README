@@ -1,3 +1,5 @@
 include
+=======
 
-global C headers or struct
+Public C headers for the Tracey compiler and its modules. Each module's
+header lives under `tracey/`.
