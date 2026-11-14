@@ -1,77 +1,83 @@
-IMPORTANT!
-----------
-
-Due to workflow actions limit in codeberg.org, we're officially moving to gitHub.com.
-We're supporting 2 repository activities if you want contribute in yours favorite platform.
-
 Tracey
----------
+======
 
-Tracey is a compiler for the Tracey programming language (`.trc`).
+Tracey is a compiler for the Tracey programming language (`.trc` files).
+It is written in ISO C17 and targets AArch64 Linux. The compiler can
+produce assembly, or assemble and link it into a native executable in one
+step.
 
-Tracey aims to be a low-level systems programming language that provides
-greater memory safety while maintaining performance and control close to
-traditional native languages.
+Status
+------
 
-Project Status
+Tracey is in the bootstrap stage. The compiler is under active development
+and is not yet considered stable. Language syntax, compiler internals, and
+project structure may change before the first public release. Breaking
+changes may occur without notice.
+
+What works today
+----------------
+
+- Functions with parameters, including `void`, and forward references.
+- Local variables: `int`, `bool`, `char`, `short`, `long`, `float`,
+  `double`, `unsigned`/`signed` variants, `size_t`, and pointers.
+- Fixed-size arrays that decay to pointers.
+- Statements: `if`/`else`, `while`, `for`, `break`, `continue`, `goto`,
+  labels, `return`, blocks, and expression statements.
+- Expressions: arithmetic, comparisons, logical, bitwise, ternary `?:`,
+  assignment and compound assignment, indexing, address-of, and dereference.
+- A small standard library: `print`, `printf`, `input_int`, `input_str`.
+- A C-like preprocessor: `#include`, `#define`, `#ifdef`, `#ifndef`,
+  `#if`, `#endif`, `#defined`.
+- An internal AArch64 assembler and linker that produce ELF64 executables.
+
+Repository layout
 -----------------
 
-Tracey is currently in the bootstrap stage.
+- `general/` — compiler source code
+- `include/` — public headers
+- `dependencies/` — external dependencies (none required at build time)
+- `docs/` — documentation
+- `etc/` — project configuration presets
+- `lib/` — standard library headers and implementations
+- `runtime/` — mini runtime notes
+- `test/` — C unit tests
+- `tests/` — end-to-end language tests
+- `tools/` — compiler, assembler, and linker drivers
+- `build/` — build output (generated)
 
-The compiler is under active development and is not yet considered stable.
-Language syntax, compiler internals, and project structure may change
-frequently until the first public release.
-
-Repository Structure
------------------------
-general/      Source code
-include/      Public headers
-dependencies/ External dependencies
-docs/         Documentation
-etc/          Project configuration files
-lib/          Standard library
-runtime/      Mini runtime
-test/         Unit tests
-tools/        Internal assembler and linker drivers
-build/        Build output (generated)
-
-See docs/README for the documentation index.
+See `docs/README` for the documentation index.
 
 Development
---------------
+-----------
 
-Tracey is currently being developed using ISO C17.
-
-Current focus:
-
-- Command-line interface
-- Source file handling
-- Lexer
-- Parser
-- Semantic analysis
-- Code generation
+Tracey is developed in ISO C17. The build uses GNU Make and Python 3
+(for Kconfig).
 
 Build
 -----
 
 ```bash
-make          # build traceyc, traceyas, traceyld, tests
-make test     # run unit tests
-make clean    # remove build directory
+make          # build traceyc, traceyas, traceyld, and the tests
+make test     # run unit tests and end-to-end language tests
+make clean    # remove the build directory
 ```
 
-See docs/build.md for full build instructions.
+See `docs/build.md` for full build instructions, including configuration
+presets and sanitizers.
 
-Coding Style
+Coding style
 ------------
 
-All C code follows AGENTS.md. See docs/maintenance.md.
+All C code follows `AGENTS.md`. See `docs/maintenance.md`.
 
 Contributing
----------------
+------------
 
-Contributions, bug reports, and suggestions are welcome.
+Contributions, bug reports, and suggestions are welcome. As the language
+is still in early development, breaking changes may occur without notice.
 
-As the language is still in early development, breaking changes may occur
-without notice.
-```
+Note
+----
+
+The project moved its primary hosting to GitHub. Repository activity is
+supported on both platforms for contributors who prefer either one.
