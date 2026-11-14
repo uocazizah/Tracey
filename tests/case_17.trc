@@ -1,0 +1,6 @@
+// case_17.trc: unary - (negation)
+// expect_exit: 8
+int main()
+{
+    return -(-8);
+}
