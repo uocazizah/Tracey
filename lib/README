@@ -1,1 +1,6 @@
-standard library placeholder
+lib
+===
+
+Standard library for Tracey. `stdio.htrc` declares the built-in I/O
+functions and `stdio.trc` provides their (minimal) implementation notes.
+These files are installed alongside the compiler.
