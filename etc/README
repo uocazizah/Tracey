@@ -1,1 +1,5 @@
-config examples placeholder
+etc
+===
+
+Kconfig presets used by `make menuconfig-*`:
+`minimal.config`, `default.config`, and `all.config`.
