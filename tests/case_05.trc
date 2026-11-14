@@ -1,0 +1,8 @@
+// case_05.trc: variable declaration + init
+// expect_exit: 30
+int main()
+{
+    int a = 10;
+    int b = 20;
+    return a + b;
+}
