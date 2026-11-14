@@ -1,0 +1,13 @@
+// case_32.trc: input_int builtin (regression)
+// expect_exit: 0
+// expect_stdout: 42
+// expect_stdin: 42
+// Regression for the dangling 'if' in codegen that skipped the builtin
+// dispatch and emitted an unresolved 'input_int' symbol.
+
+int main()
+{
+    int x = input_int();
+    print(x);
+    return 0;
+}
