@@ -3,7 +3,7 @@
 # The project is built exclusively with a C17 compiler. Libraries are built
 # as static archives and, for the public modules, as shared objects as well.
 
-.PHONY: all clean test menuconfig olddefconfig help \
+.PHONY: all clean test test-e2e menuconfig olddefconfig help \
         menuconfig-minimal menuconfig-default menuconfig-all \
         install uninstall
 
@@ -146,12 +146,30 @@ $(TEST_PARSER): $(OBJ_DIR)/test/test_parser.o $(BUILD_DIR)/libtracey_parser.a $(
 $(TEST_SEMANTIC): $(OBJ_DIR)/test/test_semantic.o $(BUILD_DIR)/libtracey_semantic.a $(BUILD_DIR)/libtracey_parser.a $(BUILD_DIR)/libtracey_ast.a $(BUILD_DIR)/libtracey_lexer.a $(BUILD_DIR)/libtracey_common.a
 	$(Q)$(CC) $(LDFLAGS) $^ $(LDLIBS) -o $@
 
-test: $(TEST_BINS)
+# End-to-end tests: tests/run.sh compiles each tests/case_*.trc with traceyc,
+# executes the resulting binary, and checks the exit code and stdout against
+# the expectations embedded in each case.
+#
+# Code generation targets AArch64 Linux and the produced binaries are executed
+# directly, so these cases are only meaningful when the host can run AArch64
+# code. On other hosts the e2e step is skipped rather than failing the build.
+HOST_ARCH := $(shell uname -m)
+ifeq ($(HOST_ARCH),aarch64)
+E2E_CMD := bash tests/run.sh $(TRACEYC)
+else
+E2E_CMD := echo "[e2e] skipped: host '$(HOST_ARCH)' cannot execute AArch64 binaries"
+endif
+
+test: $(TEST_BINS) $(TRACEYC)
 	$(Q)$(TEST_LEXER)
 	$(Q)$(TEST_SOURCE)
 	$(Q)$(TEST_ARGUMENT)
 	$(Q)$(TEST_PARSER)
 	$(Q)$(TEST_SEMANTIC)
+	$(Q)$(E2E_CMD)
+
+test-e2e: $(TRACEYC)
+	$(Q)$(E2E_CMD)
 
 menuconfig:
 	$(PYTHON) scripts/kconfig_tool.py menuconfig --kconfig Kconfig --config $(CONFIG_FILE)
@@ -171,7 +189,8 @@ menuconfig-all:
 help:
 	@echo "Targets:"
 	@echo "  all          Build compiler and tools"
-	@echo "  test         Run unit tests"
+	@echo "  test         Run unit tests and end-to-end language tests"
+	@echo "  test-e2e     Run only the end-to-end language tests"
 	@echo "  menuconfig            Configure build (interactive)"
 	@echo "  menuconfig-minimal    Use minimal preset (no assembler/linker)"
 	@echo "  menuconfig-default    Use default preset"
