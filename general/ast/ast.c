@@ -52,6 +52,8 @@ void tracey_expr_destroy(struct tracey_expr *expr)
         case TRACEY_EXPR_STRING:
             free(expr->as.string_expr.value);
             break;
+        case TRACEY_EXPR_CHAR:
+            break;
         case TRACEY_EXPR_IDENT:
             free(expr->as.ident_expr.name);
             break;
@@ -77,6 +79,11 @@ void tracey_expr_destroy(struct tracey_expr *expr)
                 tracey_expr_destroy(expr->as.call_expr.args[i]);
             free(expr->as.call_expr.args);
             free(expr->as.call_expr.callee);
+            break;
+        case TRACEY_EXPR_TERNARY:
+            tracey_expr_destroy(expr->as.ternary_expr.condition);
+            tracey_expr_destroy(expr->as.ternary_expr.then_branch);
+            tracey_expr_destroy(expr->as.ternary_expr.else_branch);
             break;
         default:
             break;
@@ -114,6 +121,22 @@ void tracey_stmt_destroy(struct tracey_stmt *stmt)
         case TRACEY_STMT_WHILE:
             tracey_expr_destroy(stmt->as.while_stmt.condition);
             tracey_stmt_destroy(stmt->as.while_stmt.body);
+            break;
+        case TRACEY_STMT_FOR:
+            tracey_stmt_destroy(stmt->as.for_stmt.init);
+            tracey_expr_destroy(stmt->as.for_stmt.condition);
+            tracey_expr_destroy(stmt->as.for_stmt.update);
+            tracey_stmt_destroy(stmt->as.for_stmt.body);
+            break;
+        case TRACEY_STMT_BREAK:
+        case TRACEY_STMT_CONTINUE:
+            break;
+        case TRACEY_STMT_GOTO:
+            free(stmt->as.goto_stmt.label);
+            break;
+        case TRACEY_STMT_LABEL:
+            free(stmt->as.label_stmt.label);
+            tracey_stmt_destroy(stmt->as.label_stmt.stmt);
             break;
         case TRACEY_STMT_RETURN:
             tracey_expr_destroy(stmt->as.return_stmt.value);
