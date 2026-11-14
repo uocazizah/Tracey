@@ -3,8 +3,8 @@
 ## Overview
 
 The Tracey bootstrap compiler is a multi-stage compiler written in ISO C17.
-It compiles `.trc` source files into assembly (and, with the internal
-toolchain, into native executables) for AArch64 Linux.
+It compiles `.trc` source files into assembly, and (with the internal
+toolchain) into native AArch64 Linux executables.
 
 ## Pipeline
 
@@ -13,6 +13,9 @@ source file
    |
    v
 source::read()        -- hardened file loading
+   |
+   v
+preprocessor          -- #include, #define, conditionals
    |
    v
 lexer                 -- tokens
@@ -43,7 +46,14 @@ regular-file checks, size limits).
 ### argument
 Located in `general/argument/` and `include/tracey/argument.h`.
 Command-line parser. Supports `--help`, `--version`, `--verbose`,
-`--warnings-as-errors`, `--debug-info`, `-O0..-O3`, `-o`, `-I`, `-D`.
+`--warnings-as-errors`, `--debug-info`, `-O0..-O3`, `-o`, `-I`, `-D`,
+`-S`/`--assembly`.
+
+### preprocessor
+Located in `general/preprocessor/` and `include/tracey/preprocessor.h`.
+Textual preprocessor: `#include`, `#define` (object-like and
+single-argument function-like macros), `#ifdef`, `#ifndef`, `#if`,
+`#endif`, `#defined`.
 
 ### lexer
 Located in `general/lexer/` and `include/tracey/lexer.h`.
@@ -69,20 +79,27 @@ Minimal AArch64 assembler producing ELF64 relocatable objects.
 Located in `general/linker/` and `include/tracey/linker.h`.
 Minimal ELF64 AArch64 linker producing executables.
 
+### runtime
+Located in `general/runtime/` and `include/tracey/runtime.h`.
+Emits the syscall-based runtime helpers (print, input, etc.) used by
+generated programs.
+
 ### config
 Located in `include/tracey/config.h`.
 Wraps Kconfig-generated macros into typed constexpr accessors.
 
 ## Data flow
 
-1. `index.c` reads all input files.
-2. Each file is lexed; lexer errors are reported and stop processing that file.
-3. Each file is parsed into a `program` AST.
-4. Semantic analysis validates the AST.
-5. Code generation emits assembly text.
-6. Assembly text from all inputs is concatenated.
-7. If `--output` is given, the text is written to that file; otherwise it is
-   printed to stdout.
+1. `tools/traceyc/main.c` reads all input files.
+2. Each file is preprocessed; preprocessor errors stop that file.
+3. Each file is lexed; lexer errors are reported and stop that file.
+4. Each file is parsed into a `program` AST.
+5. Semantic analysis validates the AST.
+6. Code generation emits assembly text.
+7. Assembly from all inputs is concatenated.
+8. With `-S`, the text is written to the output file (or stdout). Otherwise
+   the internal assembler and linker turn it into an executable, named
+   `a.out` by default.
 
 When using the internal toolchain, assembly text is further assembled and
 linked into an executable.
