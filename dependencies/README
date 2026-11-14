@@ -1,7 +1,6 @@
 dependencies
+============
 
-for external packages & sources
-
-The compiler and its test suite are written in ISO C17 and use no external
-source dependencies. The former vendored doctest framework has been removed
-now that the tests use the small C harness in test/test_harness.h.
+External packages and sources. The compiler and its test suite are written
+in ISO C17 and use no external source dependencies. The tests use the small
+C harness in `test/test_harness.h`.
