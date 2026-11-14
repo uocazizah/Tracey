@@ -2,8 +2,14 @@
 
 ## Overview
 
-`traceyld` is a minimal ELF64 AArch64 linker. It combines relocatable objects
-produced by `traceyas` into a statically linked executable.
+`traceyld` is a minimal ELF64 AArch64 linker. It combines relocatable
+objects produced by `traceyas` into a statically linked executable.
+
+## Usage
+
+```bash
+traceyld output.elf input1.o [input2.o ...]
+```
 
 ## Process
 
