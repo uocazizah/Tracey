@@ -1,0 +1,8 @@
+// case_06.trc: arithmetic + and -
+// expect_exit: 14
+int main()
+{
+    int a = 10;
+    int b = 3;
+    return a - b + 7;
+}
