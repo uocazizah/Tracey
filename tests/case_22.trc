@@ -1,0 +1,13 @@
+// case_22.trc: while with bool flag
+// expect_exit: 1
+int main()
+{
+    bool c = true;
+    int n = 0;
+    while (c)
+    {
+        n = n + 1;
+        c = false;
+    }
+    return n;
+}
