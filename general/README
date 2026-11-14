@@ -1,3 +1,5 @@
 general
+=======
 
-source files directory
+Source files for the Tracey compiler, grouped by module (lexer, parser,
+semantic analysis, code generation, assembler, linker, and so on).
