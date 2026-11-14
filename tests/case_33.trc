@@ -1,0 +1,14 @@
+// case_33.trc: input_str builtin (regression)
+// expect_exit: 0
+// expect_stdout: hello tracey
+// expect_stdin: hello tracey
+// Regression for the dangling 'if' in codegen that skipped the builtin
+// dispatch and emitted an unresolved 'input_str' symbol.
+
+int main()
+{
+    char buf[32];
+    input_str(buf, 32);
+    print(buf);
+    return 0;
+}
