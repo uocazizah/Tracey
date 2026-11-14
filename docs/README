@@ -1,7 +1,7 @@
 # Tracey Bootstrap Compiler Documentation
 
-This directory contains the documentation for the Tracey bootstrap compiler (`traceyc`)
-and its experimental internal toolchain (assembler + linker).
+This directory contains the documentation for the Tracey bootstrap compiler
+(`traceyc`) and its experimental internal toolchain (assembler and linker).
 
 ## Contents
 
@@ -19,8 +19,15 @@ and its experimental internal toolchain (assembler + linker).
 
 ## Project status
 
-Tracey is in the bootstrap stage. The compiler currently supports a minimal
-subset of the language: functions, local variables, `if`/`while`, arithmetic,
-comparisons, logical operators, and `return`. The internal assembler/linker
-support AArch64 Linux only. The compiler automatically invokes the assembler
-and linker and produces `a.out` by default.
+Tracey is in the bootstrap stage. The compiler currently supports a broad
+subset of a C-like language: functions (including `void` and variadic
+declarations), local variables of many integer and floating-point types,
+pointers and fixed-size arrays, `if`/`else`, `while`, `for`, `break`,
+`continue`, `goto` and labels, arithmetic, comparisons, logical and bitwise
+operators, ternary `?:`, assignment and compound assignment, and `return`.
+The internal assembler and linker support AArch64 Linux only.
+
+The compiler runs the full pipeline itself: it preprocesses, lexes,
+parses, type-checks, generates assembly, then (unless asked for assembly
+only) assembles and links the result into an executable. By default the
+executable is named `a.out`.
