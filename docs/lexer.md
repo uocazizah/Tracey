@@ -1,17 +1,17 @@
 # Lexer
 
 Specification and implementation notes for the bootstrap compiler's lexer
-(` include/tracey/lexer.h`, ` general/lexer/`).
+(`include/tracey/lexer.h`, `general/lexer/`).
 
 This document is the reference for what the lexer currently accepts. The
 parser and later stages must agree with it; when a rule here changes, update
-the unit tests in ` test/test_lexer.c` in the same change.
+the unit tests in `test/test_lexer.c` in the same change.
 
 ## Model
 
-- Input is an in-memory `struct tracey_string_view` produced by `tracey::source`. The
-  lexer is byte-oriented: a byte ≥ 0x80 is an invalid character for now
-  (UTF-8 identifiers are future work).
+- Input is an in-memory `struct tracey_string_view` produced by
+  `tracey::source`. The lexer is byte-oriented: a byte at or above 0x80 is
+  an invalid character for now (UTF-8 identifiers are future work).
 - Token lexemes are non-owning views into the source buffer; they stay valid
   for as long as the source object does.
 - Positions are 1-based: `line` counts `\n`, `column` counts bytes on the
@@ -22,6 +22,8 @@ the unit tests in ` test/test_lexer.c` in the same change.
 - `peek()` scans at most one token ahead and caches it; `next()` consumes the
   cache before scanning. `is_at_end()` reports "no bytes left" — not "the next
   token is EOF" (see the header comment for the distinction).
+- Blank lines are handled correctly: an empty line expands to an empty
+  string and is passed through to the lexer.
 
 ## Trivia
 
@@ -41,14 +43,16 @@ An unterminated block comment is a lexical error anchored at its opening
 ### Keywords
 
 ```
-bool   else   false  if     int
-return true   void   while
+bool   break  char   continue double else
+false  float  for    goto     if     int
+long   return short  signed   size_t true
+unsigned void  while
 ```
 
-Only an exact match with an identifier's text is a keyword: `intx`, `return0`
-and `_int` are identifiers. The lookup table is a linear scan (fine at this
-size); entries are kept sorted so a future binary search or switch-based
-dispatch is a mechanical change.
+Only an exact match with an identifier's text is a keyword: `intx`,
+`return0`, and `_int` are identifiers. The lookup table is a linear scan
+(fine at this size); entries are kept sorted so a future binary search or
+switch-based dispatch is a mechanical change.
 
 ### Identifiers
 
@@ -56,12 +60,26 @@ dispatch is a mechanical change.
 
 ### Integers
 
-Decimal digits only: `[0-9]+`. Leading zeros are currently accepted
-(`007` is one token). A letter or underscore immediately after the digits is
-an error (`invalid_number_suffix`), and the whole run is consumed so the
-diagnostic can show it — `123abc` and `0x10` are reported, never silently
-split into two tokens. Hexadecimal, binary, floating point and suffixes are
-future work.
+Decimal digits: `[0-9]+`. The lexer also recognises hexadecimal (`0x`/`0X`)
+and binary (`0b`/`0B`) prefixes. Leading zeros are accepted (`007` is one
+token). A letter or underscore immediately after the digits is an error
+(`invalid_number_suffix`), and the whole run is consumed so the diagnostic
+can show it — `123abc` and `0x10` are reported, never silently split into
+two tokens.
+
+Note: the parser currently decodes decimal integer literals only. Hexadecimal
+and binary prefixes are accepted by the lexer but are not yet converted
+correctly, so avoid them in source for now.
+
+### Floating point
+
+Decimal floating-point literals: `1.5`, `1e3`, `2.5f`. The `f`/`F` suffix
+marks a single-precision value.
+
+### Characters
+
+Single-quoted, single-line (`'a'`). Escapes are the same as for strings.
+Multi-character constants are not specially handled.
 
 ### Strings
 
@@ -69,7 +87,7 @@ Double-quoted, single-line (`"..."`). The raw lexeme includes both quotes;
 decoding escapes is the parser's job. Accepted escapes:
 
 ```
-\n  \t  \r  \\  \"  \0
+\n  \t  \r  \\  \"  \0  \'
 ```
 
 - An invalid escape is an error anchored at the offending backslash; the
@@ -94,15 +112,21 @@ decoding escapes is the parser's job. Accepted escapes:
 | `==`   | `equal_equal`  | `<=`   | `less_equal`    |
 | `!=`   | `bang_equal`   | `>=`   | `greater_equal` |
 | `&&`   | `amp_amp`      | `\|\|` | `pipe_pipe`     |
+| `&`    | `ampersand`    | `\|`   | `pipe`          |
+| `^`    | `caret`        | `~`    | `tilde`         |
+| `<<`   | `less_less`    | `>>`   | `greater_greater` |
+| `?`    | `question`     | `:`    | `colon`         |
+| `+=` `-=` `*=` `/=` `%=` | compound assign | `<<=` `>>=` `&=` `\|=` `^=` | compound assign |
 
-A slash is division unless it opens a comment. A lone `&` or `|` is an
-invalid character for now (bitwise operators are future work).
+A slash is division unless it opens a comment. A lone `&` or `|` is the
+bitwise operator, not an error.
 
 ### Not yet implemented
 
-Hex/binary integers, floats, char literals (`'a'`), bitwise and shift
-operators, compound assignment (`+=`, `-=`, ...), increment/decrement,
-question mark/colon. Add them here first, then in the lexer, then in tests.
+Hex/binary integer value conversion in the parser, char literals wider than
+one byte, increment/decrement operators (`++`, `--`), bitwise shift code
+generation (the operators are lexed and parsed but not evaluated), and
+`sizeof` as an expression.
 
 ## Errors and recovery
 
@@ -116,7 +140,9 @@ guarantees progress and termination.
 | `invalid_character`     | the offending byte      | that byte             |
 | `invalid_number_suffix` | first digit             | digits plus suffix    |
 | `invalid_escape`        | the backslash           | `\` + escaped byte    |
+| `invalid_char_escape`   | the backslash           | `\` + escaped byte    |
 | `unterminated_string`   | the opening quote       | quote up to line end  |
+| `unterminated_char`     | the opening quote       | quote up to line end  |
 | `unterminated_comment`  | the opening `/*`        | comment up to EOF     |
 
 The `traceyc` driver prints one line per error to stderr:
@@ -131,9 +157,9 @@ seen. The token dump is printed only with `--verbose`.
 
 ## Testing
 
-Unit tests live in ` test/test_lexer.c` (built with the repository's small
-C17 harness in ` test/test_harness.h`), including a deterministic fuzz-lite case
-that asserts lexeme bounds and progress on arbitrary bytes. Run:
+Unit tests live in `test/test_lexer.c` (built with the repository's small
+C17 harness in `test/test_harness.h`), including a deterministic fuzz-lite
+case that asserts lexeme bounds and progress on arbitrary bytes. Run:
 
 ```
 make test
