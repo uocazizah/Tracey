@@ -1,0 +1,27 @@
+// case_36.trc: independent struct variables
+// expect_exit: 0
+// expect_stdout: 201020125
+// Two struct locals of the same type must occupy distinct frame slots, so
+// writes through one variable do not affect the other.
+
+struct Point
+{
+    int x;
+    int y;
+};
+
+int main()
+{
+    struct Point a;
+    struct Point b;
+
+    a.x = 10;
+    a.y = 20;
+    b.x = 1;
+    b.y = 2;
+    print(a.x + a.y * 100);
+    print(b.x + b.y * 100);
+    a.y = a.y + 5;
+    print(a.y);
+    return 0;
+}
