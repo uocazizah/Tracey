@@ -26,6 +26,11 @@ struct tracey_local_var
     int size;
     bool is_array;
     enum tracey_type_kind type;
+    /*
+     * Struct definition index when type is TRACEY_TYPE_STRUCT, otherwise
+     * -1. Used by member access to find member offsets.
+     */
+    int struct_id;
 };
 
 struct tracey_strtab_entry
@@ -59,6 +64,13 @@ struct tracey_codegen_ctx
     char **continue_stack;
     size_t continue_count;
     size_t continue_cap;
+    /*
+     * Borrowed pointer to the program being generated. It supplies the
+     * struct definitions used to lay out aggregate locals and to resolve
+     * member offsets. The pointer is valid only for the duration of
+     * tracey_codegen_generate.
+     */
+    const struct tracey_program *program;
 };
 
 static void sb_init(struct tracey_string_builder *sb)
@@ -228,6 +240,73 @@ void tracey_codegen_init(struct tracey_code_generator *cg, enum tracey_target_ar
 static void cg_gen_expr(struct tracey_codegen_ctx *ctx, const struct tracey_expr *e);
 static void cg_gen_stmt(struct tracey_codegen_ctx *ctx, const struct tracey_stmt *s, const char *fn_name);
 
+static int cg_infer_struct_id(struct tracey_codegen_ctx *ctx, const struct tracey_expr *e);
+
+/*
+ * cg_infer_struct_id - resolve the struct id of an expression.
+ *
+ * Returns the struct definition index when e has struct value type, or -1
+ * otherwise. Identifier results come from the local slot recorded during
+ * variable collection; member results come from the member's own type in
+ * the base struct. No diagnostics are produced.
+ */
+static int cg_infer_struct_id(struct tracey_codegen_ctx *ctx, const struct tracey_expr *e)
+{
+    if (e == NULL)
+        return -1;
+
+    if (e->kind == TRACEY_EXPR_IDENT)
+    {
+        int idx = cg_find_local(ctx, e->as.ident_expr.name);
+
+        if (idx >= 0 && ctx->locals[idx].type == TRACEY_TYPE_STRUCT)
+            return ctx->locals[idx].struct_id;
+        return -1;
+    }
+
+    if (e->kind == TRACEY_EXPR_MEMBER)
+    {
+        int base_sid = cg_infer_struct_id(ctx, e->as.member_expr.base);
+        const struct tracey_struct_def *def;
+        size_t i;
+
+        if (base_sid < 0 || ctx->program == NULL ||
+            (size_t)base_sid >= ctx->program->struct_count)
+            return -1;
+        def = &ctx->program->structs[base_sid];
+        for (i = 0; i < def->member_count; i++)
+        {
+            if (def->members[i].name != NULL &&
+                strcmp(def->members[i].name, e->as.member_expr.field) == 0)
+                return def->members[i].struct_id;
+        }
+    }
+    return -1;
+}
+
+/*
+ * cg_member - find a member in the struct selected by base_sid.
+ *
+ * Returns a borrowed pointer to the member, or NULL when the struct or the
+ * member cannot be resolved.
+ */
+static const struct tracey_struct_member *
+cg_member(struct tracey_codegen_ctx *ctx, int base_sid, const char *field)
+{
+    const struct tracey_struct_def *def;
+    size_t i;
+
+    if (ctx->program == NULL || base_sid < 0 || (size_t)base_sid >= ctx->program->struct_count)
+        return NULL;
+    def = &ctx->program->structs[base_sid];
+    for (i = 0; i < def->member_count; i++)
+    {
+        if (def->members[i].name != NULL && strcmp(def->members[i].name, field) == 0)
+            return &def->members[i];
+    }
+    return NULL;
+}
+
 static enum tracey_type_kind cg_infer_type(struct tracey_codegen_ctx *ctx,
                                            const struct tracey_expr *e)
 {
@@ -348,6 +427,23 @@ static enum tracey_type_kind cg_infer_type(struct tracey_codegen_ctx *ctx,
             return TRACEY_TYPE_INT;
         case TRACEY_EXPR_TERNARY:
             return cg_infer_type(ctx, e->as.ternary_expr.then_branch);
+        case TRACEY_EXPR_MEMBER:
+        {
+            int sid = cg_infer_struct_id(ctx, e);
+            if (sid >= 0 && ctx->program != NULL && (size_t)sid < ctx->program->struct_count)
+            {
+                const struct tracey_struct_def *def = &ctx->program->structs[sid];
+                size_t i;
+
+                for (i = 0; i < def->member_count; i++)
+                {
+                    if (def->members[i].name != NULL &&
+                        strcmp(def->members[i].name, e->as.member_expr.field) == 0)
+                        return def->members[i].type;
+                }
+            }
+            return TRACEY_TYPE_INT;
+        }
         default:
             return TRACEY_TYPE_INT;
     }
@@ -360,7 +456,7 @@ static enum tracey_type_kind cg_infer_type(struct tracey_codegen_ctx *ctx,
  * The stored name is a heap copy owned by the context.
  */
 static void cg_add_local(struct tracey_codegen_ctx *ctx, const char *name, int size, bool is_array,
-                         enum tracey_type_kind type)
+                         enum tracey_type_kind type, int struct_id)
 {
     if (cg_find_local(ctx, name) >= 0)
         return;
@@ -381,6 +477,7 @@ static void cg_add_local(struct tracey_codegen_ctx *ctx, const char *name, int s
     ctx->locals[ctx->local_count].size = size;
     ctx->locals[ctx->local_count].is_array = is_array;
     ctx->locals[ctx->local_count].type = type;
+    ctx->locals[ctx->local_count].struct_id = struct_id;
     ctx->local_count++;
 }
 
@@ -410,8 +507,16 @@ static void cg_collect_vars_stmt(const struct tracey_stmt *s, struct tracey_code
                          ? (int)(s->as.var_decl_stmt.array_size * 8)
                          : 8;
             enum tracey_type_kind t = s->as.var_decl_stmt.type;
+            int sid = s->as.var_decl_stmt.struct_id;
 
-            if (s->as.var_decl_stmt.array_size > 0)
+            if (t == TRACEY_TYPE_STRUCT && ctx->program != NULL &&
+                sid >= 0 && (size_t)sid < ctx->program->struct_count)
+            {
+                sz = (int)ctx->program->structs[sid].size;
+                if (sz <= 0)
+                    sz = 8;
+            }
+            else if (s->as.var_decl_stmt.array_size > 0)
             {
                 if (t == TRACEY_TYPE_INT)
                     t = TRACEY_TYPE_INT_PTR;
@@ -439,12 +544,20 @@ static void cg_collect_vars_stmt(const struct tracey_stmt *s, struct tracey_code
                     t = TRACEY_TYPE_DOUBLE_PTR;
             }
             cg_add_local(ctx, s->as.var_decl_stmt.name, sz,
-                         s->as.var_decl_stmt.array_size > 0, t);
+                         s->as.var_decl_stmt.array_size > 0, t, sid);
             return;
         }
         case TRACEY_STMT_IF:
             cg_collect_vars_stmt(s->as.if_stmt.then_branch, ctx);
             cg_collect_vars_stmt(s->as.if_stmt.else_branch, ctx);
+            return;
+        case TRACEY_STMT_DO_WHILE:
+            cg_collect_vars_stmt(s->as.do_while_stmt.body, ctx);
+            return;
+        case TRACEY_STMT_SWITCH:
+            for (size_t _ci = 0; _ci < s->as.switch_stmt.case_count; _ci++)
+                cg_collect_vars_stmt(s->as.switch_stmt.cases[_ci].body, ctx);
+            cg_collect_vars_stmt(s->as.switch_stmt.default_body, ctx);
             return;
         case TRACEY_STMT_WHILE:
             cg_collect_vars_stmt(s->as.while_stmt.body, ctx);
@@ -556,6 +669,69 @@ static void cg_gen_printf(struct tracey_codegen_ctx *ctx, const struct tracey_ca
         cg_emit(ctx, "bl __tracey_print_str");
     }
     free(seg);
+}
+
+/*
+ * cg_gen_addr - compute the address of an lvalue into x0.
+ *
+ * Handles identifiers, member access, subscript and dereference. Arrays
+ * yield the base address of their frame slot. The result is a byte address
+ * in x0; callers load or store through it. This separation is what allows
+ * struct members to be used as both rvalues and assignment targets.
+ */
+static void cg_gen_addr(struct tracey_codegen_ctx *ctx, const struct tracey_expr *e)
+{
+    if (e == NULL)
+        return;
+
+    switch (e->kind)
+    {
+        case TRACEY_EXPR_IDENT:
+        {
+            int o = cg_local_offset(ctx, e->as.ident_expr.name);
+
+            if (o < 0)
+                cg_emitf(ctx, "sub x0, x29, #%d", -o);
+            else
+                cg_emitf(ctx, "add x0, x29, #%d", o);
+            return;
+        }
+        case TRACEY_EXPR_MEMBER:
+        {
+            int base_sid = cg_infer_struct_id(ctx, e->as.member_expr.base);
+            const struct tracey_struct_member *m =
+                cg_member(ctx, base_sid, e->as.member_expr.field);
+            size_t off = (m != NULL) ? m->offset : 0;
+
+            cg_gen_addr(ctx, e->as.member_expr.base);
+            if (off != 0)
+                cg_emitf(ctx, "add x0, x0, #%zu", off);
+            return;
+        }
+        case TRACEY_EXPR_INDEX:
+        {
+            enum tracey_type_kind bt = cg_infer_type(ctx, e->as.index_expr.base);
+            int stride = (bt == TRACEY_TYPE_CHAR_PTR) ? 1 : 8;
+
+            cg_gen_expr(ctx, e->as.index_expr.base);
+            cg_emit(ctx, "sub sp, sp, #16");
+            cg_emit(ctx, "str x0, [sp]");
+            cg_gen_expr(ctx, e->as.index_expr.index);
+            cg_emit(ctx, "mov x1, x0");
+            cg_emit(ctx, "ldr x0, [sp]");
+            cg_emit(ctx, "add sp, sp, #16");
+            cg_emitf(ctx, "mov x2, #%d", stride);
+            cg_emit(ctx, "mul x3, x1, x2");
+            cg_emit(ctx, "add x0, x0, x3");
+            return;
+        }
+        case TRACEY_EXPR_DEREF:
+            cg_gen_expr(ctx, e->as.deref_expr.operand);
+            return;
+        default:
+            cg_gen_expr(ctx, e);
+            return;
+    }
 }
 
 static void cg_gen_expr(struct tracey_codegen_ctx *ctx, const struct tracey_expr *e)
@@ -707,10 +883,84 @@ static void cg_gen_expr(struct tracey_codegen_ctx *ctx, const struct tracey_expr
                 cg_emit(ctx, "cmp x0, #0");
                 cg_emit(ctx, "cset x0, eq");
             }
-            else if (e->as.unary_expr.op == TRACEY_UNARY_BIT_NOT)
+            else if (e->as.unary_expr.op == TRACEY_UNARY_PRE_INC ||
+                     e->as.unary_expr.op == TRACEY_UNARY_PRE_DEC ||
+                     e->as.unary_expr.op == TRACEY_UNARY_POST_INC ||
+                     e->as.unary_expr.op == TRACEY_UNARY_POST_DEC)
             {
-                /* Bitwise NOT not yet supported by the assembler; return 0. */
-                cg_emit(ctx, "mov x0, #0");
+                bool is_inc = (e->as.unary_expr.op == TRACEY_UNARY_PRE_INC ||
+                               e->as.unary_expr.op == TRACEY_UNARY_POST_INC);
+                bool is_post = (e->as.unary_expr.op == TRACEY_UNARY_POST_INC ||
+                                e->as.unary_expr.op == TRACEY_UNARY_POST_DEC);
+                struct tracey_expr *op = e->as.unary_expr.operand;
+                int stride = 8;
+                if (op->kind == TRACEY_EXPR_IDENT)
+                {
+                    /* address = x29 + offset */
+                }
+                else if (op->kind == TRACEY_EXPR_INDEX)
+                {
+                    /* handled below generically via address eval */
+                }
+
+                if (op->kind == TRACEY_EXPR_IDENT)
+                {
+                    int o = cg_local_offset(ctx, op->as.ident_expr.name);
+                    /* load old */
+                    cg_emitf(ctx, "ldr x1, [x29, #%d]", o);
+                    cg_emit(ctx, "str x1, [sp]"); /* save old on temp stack */
+                    /* compute new */
+                    cg_emit(ctx, "mov x0, x1");
+                    if (is_inc)
+                        cg_emit(ctx, "add x0, x0, #1");
+                    else
+                        cg_emit(ctx, "sub x0, x0, #1");
+                    /* store new */
+                    cg_emitf(ctx, "str x0, [x29, #%d]", o);
+                    if (is_post)
+                        cg_emit(ctx, "ldr x0, [sp]"); /* old value */
+                    /* cleanup (no sp change needed) */
+                }
+                else
+                {
+                    /* Fallback: evaluate address then indirect (index/deref) */
+                    if (op->kind == TRACEY_EXPR_DEREF)
+                    {
+                        cg_gen_expr(ctx, op->as.deref_expr.operand);
+                    }
+                    else if (op->kind == TRACEY_EXPR_INDEX)
+                    {
+                        struct tracey_expr *base = op->as.index_expr.base;
+                        struct tracey_expr *idx = op->as.index_expr.index;
+                        enum tracey_type_kind bt = cg_infer_type(ctx, base);
+                        stride = (bt == TRACEY_TYPE_CHAR_PTR) ? 1 : 8;
+                        cg_gen_expr(ctx, base);
+                        cg_emit(ctx, "sub sp, sp, #16");
+                        cg_emit(ctx, "str x0, [sp]");
+                        cg_gen_expr(ctx, idx);
+                        cg_emit(ctx, "mov x1, x0");
+                        cg_emit(ctx, "ldr x0, [sp]");
+                        cg_emit(ctx, "add sp, sp, #16");
+                        cg_emitf(ctx, "mov x2, #%d", stride);
+                        cg_emit(ctx, "mul x1, x1, x2");
+                        cg_emit(ctx, "add x0, x0, x1");
+                    }
+                    cg_emit(ctx, "sub sp, sp, #32");
+                    cg_emit(ctx, "str x0, [sp]");       /* addr */
+                    cg_emit(ctx, "ldr x1, [sp]");
+                    cg_emit(ctx, "ldr x1, [x1]");       /* old value */
+                    cg_emit(ctx, "str x1, [sp, #8]");   /* save old */
+                    cg_emit(ctx, "ldr x0, [sp, #8]");
+                    if (is_inc)
+                        cg_emit(ctx, "add x0, x0, #1");
+                    else
+                        cg_emit(ctx, "sub x0, x0, #1");
+                    cg_emit(ctx, "ldr x1, [sp]");       /* addr */
+                    cg_emit(ctx, "str x0, [x1]");       /* store new */
+                    if (is_post)
+                        cg_emit(ctx, "ldr x0, [sp, #8]"); /* old value */
+                    cg_emit(ctx, "add sp, sp, #32");
+                }
             }
             return;
         }
@@ -768,6 +1018,82 @@ static void cg_gen_expr(struct tracey_codegen_ctx *ctx, const struct tracey_expr
                 return;
             }
 
+            if (strcmp(callee, "puts") == 0)
+            {
+                if (e->as.call_expr.arg_count > 0)
+                    cg_gen_expr(ctx, e->as.call_expr.args[0]);
+                cg_emit(ctx, "bl __tracey_puts");
+                return;
+            }
+            if (strcmp(callee, "putchar") == 0)
+            {
+                if (e->as.call_expr.arg_count > 0)
+                    cg_gen_expr(ctx, e->as.call_expr.args[0]);
+                cg_emit(ctx, "bl __tracey_putchar");
+                return;
+            }
+            if (strcmp(callee, "getchar") == 0)
+            {
+                cg_emit(ctx, "bl __tracey_getchar");
+                return;
+            }
+            if (strcmp(callee, "fget") == 0)
+            {
+                if (e->as.call_expr.arg_count > 0)
+                    cg_gen_expr(ctx, e->as.call_expr.args[0]);
+                cg_emit(ctx, "bl __tracey_fget");
+                return;
+            }
+            if (strcmp(callee, "scanf") == 0)
+            {
+                size_t ai;
+                for (ai = 0; ai < e->as.call_expr.arg_count; ai++)
+                {
+                    cg_gen_expr(ctx, e->as.call_expr.args[ai]);
+                    cg_emit(ctx, "sub sp, sp, #16");
+                    cg_emit(ctx, "str x0, [sp]");
+                }
+                for (ai = e->as.call_expr.arg_count; ai > 0; ai--)
+                {
+                    cg_emitf(ctx, "ldr x%zu, [sp]", ai - 1);
+                    cg_emit(ctx, "add sp, sp, #16");
+                }
+                cg_emit(ctx, "bl __tracey_scanf");
+                return;
+            }
+            if (strcmp(callee, "scanfs") == 0)
+            {
+                size_t ai;
+                for (ai = 0; ai < e->as.call_expr.arg_count; ai++)
+                {
+                    cg_gen_expr(ctx, e->as.call_expr.args[ai]);
+                    cg_emit(ctx, "sub sp, sp, #16");
+                    cg_emit(ctx, "str x0, [sp]");
+                }
+                for (ai = e->as.call_expr.arg_count; ai > 0; ai--)
+                {
+                    cg_emitf(ctx, "ldr x%zu, [sp]", ai - 1);
+                    cg_emit(ctx, "add sp, sp, #16");
+                }
+                cg_emit(ctx, "bl __tracey_scanfs");
+                return;
+            }
+            if (strcmp(callee, "fgets") == 0)
+            {
+                if (e->as.call_expr.arg_count >= 2)
+                {
+                    cg_gen_expr(ctx, e->as.call_expr.args[0]);
+                    cg_emit(ctx, "sub sp, sp, #16");
+                    cg_emit(ctx, "str x0, [sp]");
+                    cg_gen_expr(ctx, e->as.call_expr.args[1]);
+                    cg_emit(ctx, "mov x1, x0");
+                    cg_emit(ctx, "ldr x0, [sp]");
+                    cg_emit(ctx, "add sp, sp, #16");
+                }
+                cg_emit(ctx, "bl __tracey_input_str");
+                return;
+            }
+
             /* General call: evaluate arguments left to right, push each one,
              * then pop them in reverse so x0 holds the first argument. */
             for (i = 0; i < e->as.call_expr.arg_count; i++)
@@ -801,6 +1127,15 @@ static void cg_gen_expr(struct tracey_codegen_ctx *ctx, const struct tracey_expr
             free(endL);
             return;
         }
+        case TRACEY_EXPR_MEMBER:
+            /*
+             * Every struct member occupies eight bytes in this stage, so a
+             * single 64-bit load retrieves the value regardless of the
+             * declared member type.
+             */
+            cg_gen_addr(ctx, e);
+            cg_emit(ctx, "ldr x0, [x0]");
+            return;
         case TRACEY_EXPR_BINARY:
         {
             if (e->as.binary_expr.op == TRACEY_BINARY_ASSIGN)
@@ -838,6 +1173,17 @@ static void cg_gen_expr(struct tracey_codegen_ctx *ctx, const struct tracey_expr
                 if (e->as.binary_expr.left->kind == TRACEY_EXPR_DEREF)
                 {
                     cg_gen_expr(ctx, e->as.binary_expr.left->as.deref_expr.operand);
+                    cg_emit(ctx, "sub sp, sp, #16");
+                    cg_emit(ctx, "str x0, [sp]");
+                    cg_gen_expr(ctx, e->as.binary_expr.right);
+                    cg_emit(ctx, "ldr x1, [sp]");
+                    cg_emit(ctx, "add sp, sp, #16");
+                    cg_emit(ctx, "str x0, [x1]");
+                    return;
+                }
+                if (e->as.binary_expr.left->kind == TRACEY_EXPR_MEMBER)
+                {
+                    cg_gen_addr(ctx, e->as.binary_expr.left);
                     cg_emit(ctx, "sub sp, sp, #16");
                     cg_emit(ctx, "str x0, [sp]");
                     cg_gen_expr(ctx, e->as.binary_expr.right);
@@ -1109,6 +1455,88 @@ static void cg_gen_stmt(struct tracey_codegen_ctx *ctx, const struct tracey_stmt
             free(endL);
             return;
         }
+        case TRACEY_STMT_DO_WHILE:
+        {
+            char *startL = cg_new_label(ctx, ".Ldo");
+            char *condL = cg_new_label(ctx, ".Ldocond");
+            char *endL = cg_new_label(ctx, ".Lenddo");
+
+            if (ctx->break_count == ctx->break_cap)
+            {
+                size_t cap = ctx->break_cap ? ctx->break_cap * 2 : 8;
+                char **pp = (char **)realloc(ctx->break_stack, cap * sizeof(*pp));
+                if (pp == NULL) { free(startL); free(condL); free(endL); return; }
+                ctx->break_stack = pp;
+                ctx->break_cap = cap;
+            }
+            ctx->break_stack[ctx->break_count++] = endL;
+            if (ctx->continue_count == ctx->continue_cap)
+            {
+                size_t cap = ctx->continue_cap ? ctx->continue_cap * 2 : 8;
+                char **pp = (char **)realloc(ctx->continue_stack, cap * sizeof(*pp));
+                if (pp == NULL) { free(startL); free(condL); free(endL); ctx->break_count--; return; }
+                ctx->continue_stack = pp;
+                ctx->continue_cap = cap;
+            }
+            ctx->continue_stack[ctx->continue_count++] = condL;
+
+            cg_emitf(ctx, "%s:", startL);
+            cg_gen_stmt(ctx, s->as.do_while_stmt.body, fn_name);
+            cg_emitf(ctx, "%s:", condL);
+            cg_gen_expr(ctx, s->as.do_while_stmt.condition);
+            cg_emit(ctx, "cmp x0, #0");
+            cg_emitf(ctx, "b.ne %s", startL);
+            cg_emitf(ctx, "%s:", endL);
+
+            ctx->break_count--;
+            ctx->continue_count--;
+            free(startL);
+            free(condL);
+            free(endL);
+            return;
+        }
+        case TRACEY_STMT_SWITCH:
+        {
+            char *endL = cg_new_label(ctx, ".Lendswitch");
+            size_t _ci;
+
+            if (ctx->break_count == ctx->break_cap)
+            {
+                size_t cap = ctx->break_cap ? ctx->break_cap * 2 : 8;
+                char **pp = (char **)realloc(ctx->break_stack, cap * sizeof(*pp));
+                if (pp == NULL) { free(endL); return; }
+                ctx->break_stack = pp;
+                ctx->break_cap = cap;
+            }
+            ctx->break_stack[ctx->break_count++] = endL;
+
+            cg_gen_expr(ctx, s->as.switch_stmt.condition);
+            cg_emit(ctx, "sub sp, sp, #16");
+            cg_emit(ctx, "str x0, [sp]");
+
+            for (_ci = 0; _ci < s->as.switch_stmt.case_count; _ci++)
+            {
+                char *nextL = cg_new_label(ctx, ".Lcase");
+                cg_emit(ctx, "ldr x0, [sp]");
+                cg_emitf(ctx, "mov x1, #%ld", s->as.switch_stmt.cases[_ci].value);
+                cg_emit(ctx, "cmp x0, x1");
+                cg_emitf(ctx, "b.ne %s", nextL);
+                if (s->as.switch_stmt.cases[_ci].body)
+                    cg_gen_stmt(ctx, s->as.switch_stmt.cases[_ci].body, fn_name);
+                cg_emitf(ctx, "b %s", endL);
+                cg_emitf(ctx, "%s:", nextL);
+                free(nextL);
+            }
+
+            if (s->as.switch_stmt.default_body)
+                cg_gen_stmt(ctx, s->as.switch_stmt.default_body, fn_name);
+
+            cg_emitf(ctx, "%s:", endL);
+            cg_emit(ctx, "add sp, sp, #16");
+            ctx->break_count--;
+            free(endL);
+            return;
+        }
         case TRACEY_STMT_WHILE:
         {
             char *startL = cg_new_label(ctx, ".Lwhile");
@@ -1290,6 +1718,7 @@ void tracey_codegen_generate(struct tracey_code_generator *cg, const struct trac
     memset(&ctx, 0, sizeof(ctx));
     ctx.out = out;
     ctx.module_id = module_id;
+    ctx.program = program;
     sb_init(&ctx.body);
 
     fprintf(out, "    .text\n");
@@ -1318,7 +1747,7 @@ void tracey_codegen_generate(struct tracey_code_generator *cg, const struct trac
             ctx.body.data[0] = '\0';
 
         for (i = 0; i < fn->param_count; i++)
-            cg_add_local(&ctx, fn->params[i].name, 8, false, fn->params[i].type);
+            cg_add_local(&ctx, fn->params[i].name, 8, false, fn->params[i].type, -1);
         cg_collect_vars_stmt(fn->body, &ctx);
 
         for (i = 0; i < ctx.local_count; i++)
