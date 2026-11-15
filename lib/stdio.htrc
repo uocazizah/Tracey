@@ -1,7 +1,16 @@
 // Standard I/O header for Tracey
 void print(...);
 int printf(char* fmt, ...);
+int puts(char* s);
+int putchar(int c);
+int getchar(void);
 
 // Input helpers (compiler builtins).
+int scanf(char* fmt, ...);
+int scanfs(char* fmt, ...);
+char* fget(char* buf);
+char* fgets(char* buf, int size);
+
+// Backwards-compatible aliases.
 int input_int(void);
 int input_str(char* buf, int size);
