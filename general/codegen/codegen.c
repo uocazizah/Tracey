@@ -31,6 +31,11 @@ struct tracey_local_var
      * -1. Used by member access to find member offsets.
      */
     int struct_id;
+    /*
+     * Function pointer signature when type is TRACEY_TYPE_FUNC_PTR;
+     * otherwise NULL. Borrowed from the parsed var decl.
+     */
+    struct tracey_func_sig *fn_sig;
 };
 
 struct tracey_strtab_entry
@@ -264,6 +269,24 @@ static int cg_infer_struct_id(struct tracey_codegen_ctx *ctx, const struct trace
         return -1;
     }
 
+    if (e->kind == TRACEY_EXPR_INDEX)
+    {
+        int base_sid = cg_infer_struct_id(ctx, e->as.index_expr.base);
+
+        if (base_sid < 0)
+        {
+            /* The base may be a struct array local. */
+            if (e->as.index_expr.base->kind == TRACEY_EXPR_IDENT)
+            {
+                int idx = cg_find_local(ctx, e->as.index_expr.base->as.ident_expr.name);
+
+                if (idx >= 0 && ctx->locals[idx].type == TRACEY_TYPE_STRUCT)
+                    return ctx->locals[idx].struct_id;
+            }
+        }
+        return base_sid;
+    }
+
     if (e->kind == TRACEY_EXPR_MEMBER)
     {
         int base_sid = cg_infer_struct_id(ctx, e->as.member_expr.base);
@@ -339,6 +362,8 @@ static enum tracey_type_kind cg_infer_type(struct tracey_codegen_ctx *ctx,
                 return TRACEY_TYPE_INT;
             if (bt == TRACEY_TYPE_CHAR_PTR)
                 return TRACEY_TYPE_CHAR;
+            if (bt == TRACEY_TYPE_STRUCT)
+                return TRACEY_TYPE_STRUCT;
             if (bt == TRACEY_TYPE_FLOAT_PTR)
                 return TRACEY_TYPE_FLOAT;
             if (bt == TRACEY_TYPE_DOUBLE_PTR)
@@ -456,7 +481,7 @@ static enum tracey_type_kind cg_infer_type(struct tracey_codegen_ctx *ctx,
  * The stored name is a heap copy owned by the context.
  */
 static void cg_add_local(struct tracey_codegen_ctx *ctx, const char *name, int size, bool is_array,
-                         enum tracey_type_kind type, int struct_id)
+                         enum tracey_type_kind type, int struct_id, struct tracey_func_sig *fn_sig)
 {
     if (cg_find_local(ctx, name) >= 0)
         return;
@@ -478,6 +503,7 @@ static void cg_add_local(struct tracey_codegen_ctx *ctx, const char *name, int s
     ctx->locals[ctx->local_count].is_array = is_array;
     ctx->locals[ctx->local_count].type = type;
     ctx->locals[ctx->local_count].struct_id = struct_id;
+    ctx->locals[ctx->local_count].fn_sig = fn_sig;
     ctx->local_count++;
 }
 
@@ -512,9 +538,14 @@ static void cg_collect_vars_stmt(const struct tracey_stmt *s, struct tracey_code
             if (t == TRACEY_TYPE_STRUCT && ctx->program != NULL &&
                 sid >= 0 && (size_t)sid < ctx->program->struct_count)
             {
-                sz = (int)ctx->program->structs[sid].size;
-                if (sz <= 0)
-                    sz = 8;
+                size_t struct_sz = ctx->program->structs[sid].size;
+
+                if (struct_sz <= 0)
+                    struct_sz = 8;
+                if (s->as.var_decl_stmt.array_size > 0)
+                    sz = (int)(s->as.var_decl_stmt.array_size * struct_sz);
+                else
+                    sz = (int)struct_sz;
             }
             else if (s->as.var_decl_stmt.array_size > 0)
             {
@@ -544,7 +575,8 @@ static void cg_collect_vars_stmt(const struct tracey_stmt *s, struct tracey_code
                     t = TRACEY_TYPE_DOUBLE_PTR;
             }
             cg_add_local(ctx, s->as.var_decl_stmt.name, sz,
-                         s->as.var_decl_stmt.array_size > 0, t, sid);
+                         s->as.var_decl_stmt.array_size > 0, t, sid,
+                         s->as.var_decl_stmt.fn_sig);
             return;
         }
         case TRACEY_STMT_IF:
@@ -711,7 +743,29 @@ static void cg_gen_addr(struct tracey_codegen_ctx *ctx, const struct tracey_expr
         case TRACEY_EXPR_INDEX:
         {
             enum tracey_type_kind bt = cg_infer_type(ctx, e->as.index_expr.base);
-            int stride = (bt == TRACEY_TYPE_CHAR_PTR) ? 1 : 8;
+            int stride = 8;
+
+            if (bt == TRACEY_TYPE_CHAR_PTR)
+                stride = 1;
+            else if (bt == TRACEY_TYPE_STRUCT)
+            {
+                int sid = -1;
+
+                if (e->as.index_expr.base->kind == TRACEY_EXPR_IDENT)
+                {
+                    int li = cg_find_local(ctx, e->as.index_expr.base->as.ident_expr.name);
+
+                    if (li >= 0)
+                        sid = ctx->locals[li].struct_id;
+                }
+                else
+                    sid = cg_infer_struct_id(ctx, e->as.index_expr.base);
+
+                if (sid >= 0 && ctx->program != NULL && (size_t)sid < ctx->program->struct_count)
+                    stride = (int)ctx->program->structs[sid].size;
+                if (stride <= 0)
+                    stride = 8;
+            }
 
             cg_gen_expr(ctx, e->as.index_expr.base);
             cg_emit(ctx, "sub sp, sp, #16");
@@ -785,6 +839,28 @@ static void cg_gen_expr(struct tracey_codegen_ctx *ctx, const struct tracey_expr
             int li = cg_find_local(ctx, e->as.ident_expr.name);
             int o = cg_local_offset(ctx, e->as.ident_expr.name);
             bool is_array = (li >= 0 && ctx->locals[li].is_array);
+            bool is_func = false;
+            size_t fi;
+
+            if (li < 0 && ctx->program != NULL)
+            {
+                for (fi = 0; fi < ctx->program->function_count; fi++)
+                {
+                    if (ctx->program->functions[fi] != NULL &&
+                        ctx->program->functions[fi]->name != NULL &&
+                        strcmp(ctx->program->functions[fi]->name, e->as.ident_expr.name) == 0)
+                    {
+                        is_func = true;
+                        break;
+                    }
+                }
+            }
+
+            if (is_func)
+            {
+                cg_emitf(ctx, "adr x0, %s", e->as.ident_expr.name);
+                return;
+            }
 
             if (is_array)
             {
@@ -1111,7 +1187,21 @@ static void cg_gen_expr(struct tracey_codegen_ctx *ctx, const struct tracey_expr
                 cg_emitf(ctx, "ldr x%zu, [sp]", i - 1);
                 cg_emit(ctx, "add sp, sp, #16");
             }
-            cg_emitf(ctx, "bl %s", callee);
+            {
+                int _fpi = cg_find_local(ctx, callee);
+
+                if (_fpi >= 0 && ctx->locals[_fpi].type == TRACEY_TYPE_FUNC_PTR)
+                {
+                    int _o = cg_local_offset(ctx, callee);
+
+                    cg_emitf(ctx, "ldr x9, [x29, #%d]", _o);
+                    cg_emit(ctx, "blr x9");
+                }
+                else
+                {
+                    cg_emitf(ctx, "bl %s", callee);
+                }
+            }
             return;
         }
         case TRACEY_EXPR_TERNARY:
@@ -1431,7 +1521,28 @@ static void cg_gen_stmt(struct tracey_codegen_ctx *ctx, const struct tracey_stmt
                 cg_gen_stmt(ctx, s->as.block_stmt.statements[i], fn_name);
             return;
         case TRACEY_STMT_VAR_DECL:
-            if (s->as.var_decl_stmt.init != NULL)
+            if (s->as.var_decl_stmt.init != NULL &&
+                s->as.var_decl_stmt.init->kind == TRACEY_EXPR_INIT_LIST)
+            {
+                struct tracey_init_list_expr *il = &s->as.var_decl_stmt.init->as.init_list_expr;
+                int base = cg_local_offset(ctx, s->as.var_decl_stmt.name);
+                int sid = s->as.var_decl_stmt.struct_id;
+                size_t i;
+
+                if (sid >= 0 && ctx->program != NULL && (size_t)sid < ctx->program->struct_count)
+                {
+                    for (i = 0; i < il->count; i++)
+                    {
+                        size_t off = 0;
+
+                        if (i < ctx->program->structs[sid].member_count)
+                            off = ctx->program->structs[sid].members[i].offset;
+                        cg_gen_expr(ctx, il->items[i]);
+                        cg_emitf(ctx, "str x0, [x29, #%d]", base + (int)off);
+                    }
+                }
+            }
+            else if (s->as.var_decl_stmt.init != NULL)
             {
                 int o = cg_local_offset(ctx, s->as.var_decl_stmt.name);
 
@@ -1752,7 +1863,8 @@ void tracey_codegen_generate(struct tracey_code_generator *cg, const struct trac
             ctx.body.data[0] = '\0';
 
         for (i = 0; i < fn->param_count; i++)
-            cg_add_local(&ctx, fn->params[i].name, 8, false, fn->params[i].type, -1);
+            cg_add_local(&ctx, fn->params[i].name, 8, false, fn->params[i].type, -1,
+                         fn->params[i].fn_sig);
         cg_collect_vars_stmt(fn->body, &ctx);
 
         for (i = 0; i < ctx.local_count; i++)
