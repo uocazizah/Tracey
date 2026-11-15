@@ -45,8 +45,11 @@ struct tracey_keyword_entry
 static const struct tracey_keyword_entry tracey_keywords[] = {
     {"bool", TRACEY_TOKEN_KEYWORD_BOOL},
     {"break", TRACEY_TOKEN_KEYWORD_BREAK},
+    {"case", TRACEY_TOKEN_KEYWORD_CASE},
     {"char", TRACEY_TOKEN_KEYWORD_CHAR},
     {"continue", TRACEY_TOKEN_KEYWORD_CONTINUE},
+    {"default", TRACEY_TOKEN_KEYWORD_DEFAULT},
+    {"do", TRACEY_TOKEN_KEYWORD_DO},
     {"double", TRACEY_TOKEN_KEYWORD_DOUBLE},
     {"else", TRACEY_TOKEN_KEYWORD_ELSE},
     {"false", TRACEY_TOKEN_KEYWORD_FALSE},
@@ -58,9 +61,13 @@ static const struct tracey_keyword_entry tracey_keywords[] = {
     {"long", TRACEY_TOKEN_KEYWORD_LONG},
     {"return", TRACEY_TOKEN_KEYWORD_RETURN},
     {"short", TRACEY_TOKEN_KEYWORD_SHORT},
+    {"struct", TRACEY_TOKEN_KEYWORD_STRUCT},
+    {"switch", TRACEY_TOKEN_KEYWORD_SWITCH},
     {"signed", TRACEY_TOKEN_KEYWORD_SIGNED},
     {"size_t", TRACEY_TOKEN_KEYWORD_SIZE_T},
+    {"sizeof", TRACEY_TOKEN_KEYWORD_SIZEOF},
     {"true", TRACEY_TOKEN_KEYWORD_TRUE},
+    {"typedef", TRACEY_TOKEN_KEYWORD_TYPEDEF},
     {"unsigned", TRACEY_TOKEN_KEYWORD_UNSIGNED},
     {"void", TRACEY_TOKEN_KEYWORD_VOID},
     {"while", TRACEY_TOKEN_KEYWORD_WHILE},
@@ -476,13 +483,19 @@ static struct tracey_token tracey_scan_token(struct tracey_lexer *lexer)
         case '.':
             return tracey_make_token(TRACEY_TOKEN_DOT, start_pos, 1, start_line, start_column, lexer);
         case '+':
+            if (tracey_lexer_match(lexer, '+'))
+                return tracey_make_token(TRACEY_TOKEN_PLUS_PLUS, start_pos, lexer->position - start_pos,
+                                         start_line, start_column, lexer);
             return tracey_make_token(tracey_lexer_match(lexer, '=') ? TRACEY_TOKEN_PLUS_EQUAL
-                                                                    : TRACEY_TOKEN_PLUS,
+                                                                     : TRACEY_TOKEN_PLUS,
                                      start_pos, lexer->position - start_pos, start_line,
                                      start_column, lexer);
         case '-':
+            if (tracey_lexer_match(lexer, '-'))
+                return tracey_make_token(TRACEY_TOKEN_MINUS_MINUS, start_pos, lexer->position - start_pos,
+                                         start_line, start_column, lexer);
             return tracey_make_token(tracey_lexer_match(lexer, '=') ? TRACEY_TOKEN_MINUS_EQUAL
-                                                                    : TRACEY_TOKEN_MINUS,
+                                                                     : TRACEY_TOKEN_MINUS,
                                      start_pos, lexer->position - start_pos, start_line,
                                      start_column, lexer);
         case '*':
