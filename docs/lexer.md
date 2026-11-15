@@ -43,10 +43,11 @@ An unterminated block comment is a lexical error anchored at its opening
 ### Keywords
 
 ```
-bool   break  char   continue double else
-false  float  for    goto     if     int
-long   return short  signed   size_t true
-unsigned void  while
+bool     break  case   char   continue default
+do       double else   false  float    for
+goto     if     int    long   return   short
+signed   size_t sizeof struct switch   true
+typedef  unsigned void  while
 ```
 
 Only an exact match with an identifier's text is a keyword: `intx`,
@@ -114,6 +115,7 @@ decoding escapes is the parser's job. Accepted escapes:
 | `&&`   | `amp_amp`      | `\|\|` | `pipe_pipe`     |
 | `&`    | `ampersand`    | `\|`   | `pipe`          |
 | `^`    | `caret`        | `~`    | `tilde`         |
+| `++`   | `plus_plus`    | `--`   | `minus_minus`   |
 | `<<`   | `less_less`    | `>>`   | `greater_greater` |
 | `?`    | `question`     | `:`    | `colon`         |
 | `+=` `-=` `*=` `/=` `%=` | compound assign | `<<=` `>>=` `&=` `\|=` `^=` | compound assign |
@@ -124,9 +126,9 @@ bitwise operator, not an error.
 ### Not yet implemented
 
 Hex/binary integer value conversion in the parser, char literals wider than
-one byte, increment/decrement operators (`++`, `--`), bitwise shift code
-generation (the operators are lexed and parsed but not evaluated), and
-`sizeof` as an expression.
+one byte, and bitwise shift code generation (the operators are lexed but the
+parser does not give them a precedence level, so they cannot be used in
+expressions).
 
 ## Errors and recovery
 
