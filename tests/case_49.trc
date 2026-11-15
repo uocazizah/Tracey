@@ -1,0 +1,18 @@
+// case_49.trc: preprocessor #if / #elif / #else
+// expect_exit: 0
+// expect_stdout: 2
+// Only the active branch is compiled, so the program prints 2.
+
+#define MODE2
+
+int main()
+{
+#if defined(MODE1)
+    print(1);
+#elif defined(MODE2)
+    print(2);
+#else
+    print(3);
+#endif
+    return 0;
+}
