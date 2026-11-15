@@ -45,7 +45,8 @@ bitwise_or     := bitwise_xor ('|' bitwise_xor)*
 bitwise_xor    := bitwise_and ('^' bitwise_and)*
 bitwise_and    := equality ('&' equality)*
 equality       := relational (('==' | '!=') relational)*
-relational     := additive (('<' | '>' | '<=' | '>=') additive)*
+relational     := shift (('<' | '>' | '<=' | '>=') shift)*
+shift          := additive (('<<' | '>>') additive)*
 additive       := multiplicative (('+' | '-') multiplicative)*
 multiplicative := unary (('*' | '/' | '%') unary)*
 unary          := ('-' | '!' | '~' | '&' | '*' | '++' | '--') unary
@@ -59,9 +60,6 @@ arg_list       := expression (',' expression)*
 
 Notes:
 
-- Shift operators (`<<`, `>>`) are lexed and have dedicated tokens, but the
-  parser does not currently give them a precedence level; they cannot be used
-  in expressions yet.
 - Casts (`(type) expr`) are not supported.
 - `sizeof` accepts both `sizeof(type)` and `sizeof expr`, but the bootstrap
   parser replaces it with the fixed value 8. It does not compute the real
