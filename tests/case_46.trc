@@ -1,0 +1,15 @@
+// case_46.trc: ternary conditional operator
+// expect_exit: 0
+// expect_stdout: 14
+// The condition selects the then-branch, whose value 7 is printed.
+
+int main()
+{
+    int a = 5;
+    int b = 9;
+    int m = (a < b) ? a : b;
+    int M = (a > b) ? a : b;
+
+    print(m + M);   // 5 + 9 = 14
+    return 0;
+}
