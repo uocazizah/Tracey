@@ -1,0 +1,26 @@
+// case_38.trc: bitwise NOT and hexadecimal/binary literals
+// expect_exit: 124
+// 0xFF is 255, 0b1011 is 11, 0x2A is 42, and ~0 is all ones. The switch
+// label uses a hexadecimal literal to confirm case values share the decoder.
+// 255 - 200 + 11 + (16 + 42) = 124.
+
+int main()
+{
+    int a = 0xFF;
+    int b = 0b1011;
+    int c = 0x10;
+    int arr[0x4];
+    int inv = ~0;
+
+    arr[0] = 0x2A;
+    switch (a)
+    {
+        case 0xFF:
+            c = c + arr[0];
+            break;
+        default:
+            c = 0;
+            break;
+    }
+    return a - 200 + b + c + (inv & 0);
+}
