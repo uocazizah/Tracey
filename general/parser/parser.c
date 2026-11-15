@@ -21,6 +21,68 @@ static char *tracey_token_strdup(const struct tracey_token *tok)
     return tracey_strdup_n(tok->lexeme, tok->lexeme_len);
 }
 
+/*
+ * tracey_parse_int_literal - decode an integer token into its numeric value.
+ *
+ * The lexer emits a single INTEGER token that still carries any 0x/0X or
+ * 0b/0B prefix, so the decoder must select the base from the lexeme rather
+ * than assume decimal. tok is a borrowed token whose lexeme is valid for the
+ * duration of the call.
+ *
+ * Returns true and stores the decoded magnitude in *out on success. Returns
+ * false when the token is empty or contains a digit that is invalid for the
+ * selected base; the caller is responsible for reporting a diagnostic. The
+ * value wraps modulo 2^64, which matches two's-complement expectations for
+ * the AArch64 target.
+ */
+static bool tracey_parse_int_literal(const struct tracey_token *tok, unsigned long long *out)
+{
+    size_t i = 0;
+    unsigned base = 10;
+    unsigned long long v = 0;
+
+    if (tok == NULL || tok->lexeme == NULL || tok->lexeme_len == 0 || out == NULL)
+        return false;
+
+    if (tok->lexeme_len >= 2 && tok->lexeme[0] == '0' &&
+        (tok->lexeme[1] == 'x' || tok->lexeme[1] == 'X'))
+    {
+        base = 16;
+        i = 2;
+    }
+    else if (tok->lexeme_len >= 2 && tok->lexeme[0] == '0' &&
+             (tok->lexeme[1] == 'b' || tok->lexeme[1] == 'B'))
+    {
+        base = 2;
+        i = 2;
+    }
+
+    if (i >= tok->lexeme_len)
+        return false;
+
+    for (; i < tok->lexeme_len; i++)
+    {
+        char c = tok->lexeme[i];
+        unsigned d;
+
+        if (c >= '0' && c <= '9')
+            d = (unsigned)(c - '0');
+        else if (c >= 'a' && c <= 'f')
+            d = (unsigned)(c - 'a') + 10u;
+        else if (c >= 'A' && c <= 'F')
+            d = (unsigned)(c - 'A') + 10u;
+        else
+            return false;
+
+        if (d >= base)
+            return false;
+        v = v * base + d;
+    }
+
+    *out = v;
+    return true;
+}
+
 static void tracey_parser_advance(struct tracey_parser *parser)
 {
     parser->current = tracey_lexer_next(parser->lexer);
@@ -408,14 +470,13 @@ static struct tracey_expr *tracey_parse_primary(struct tracey_parser *parser)
     if (tracey_parser_check(parser, TRACEY_TOKEN_INTEGER))
     {
         struct tracey_token tok = parser->current;
-        long long v = 0;
-        size_t i;
+        unsigned long long v = 0;
         tracey_parser_advance(parser);
-        for (i = 0; i < tok.lexeme_len; i++)
-            v = v * 10 + (tok.lexeme[i] - '0');
+        if (!tracey_parse_int_literal(&tok, &v))
+            tracey_parser_error(parser, "Invalid integer literal", &tok);
         {
             struct tracey_expr *e = tracey_expr_create(TRACEY_EXPR_INT, (struct tracey_source_loc){tok.line, tok.column});
-            if (e) e->as.int_expr.value = v;
+            if (e) e->as.int_expr.value = (long long)v;
             return e;
         }
     }
@@ -861,9 +922,29 @@ static struct tracey_expr *tracey_parse_additive(struct tracey_parser *parser)
     return left;
 }
 
-static struct tracey_expr *tracey_parse_relational(struct tracey_parser *parser)
+static struct tracey_expr *tracey_parse_shift(struct tracey_parser *parser)
 {
     struct tracey_expr *left = tracey_parse_additive(parser);
+    if (!left) return NULL;
+    while (tracey_parser_check(parser, TRACEY_TOKEN_LESS_LESS) ||
+           tracey_parser_check(parser, TRACEY_TOKEN_GREATER_GREATER))
+    {
+        enum tracey_binary_op op = tracey_parser_check(parser, TRACEY_TOKEN_LESS_LESS)
+                                       ? TRACEY_BINARY_SHIFT_LEFT
+                                       : TRACEY_BINARY_SHIFT_RIGHT;
+        struct tracey_expr *right;
+        tracey_parser_advance(parser);
+        right = tracey_parse_additive(parser);
+        if (!right) { tracey_expr_destroy(left); return NULL; }
+        left = tracey_make_binary(left, op, right);
+        if (!left) return NULL;
+    }
+    return left;
+}
+
+static struct tracey_expr *tracey_parse_relational(struct tracey_parser *parser)
+{
+    struct tracey_expr *left = tracey_parse_shift(parser);
     if (!left) return NULL;
     while (tracey_parser_check(parser, TRACEY_TOKEN_LESS) ||
            tracey_parser_check(parser, TRACEY_TOKEN_GREATER) ||
@@ -877,7 +958,7 @@ static struct tracey_expr *tracey_parse_relational(struct tracey_parser *parser)
         else if (tracey_parser_check(parser, TRACEY_TOKEN_LESS_EQUAL)) op = TRACEY_BINARY_LE;
         else op = TRACEY_BINARY_GE;
         tracey_parser_advance(parser);
-        right = tracey_parse_additive(parser);
+        right = tracey_parse_shift(parser);
         if (!right) { tracey_expr_destroy(left); return NULL; }
         left = tracey_make_binary(left, op, right);
         if (!left) return NULL;
@@ -1258,9 +1339,10 @@ static struct tracey_stmt *tracey_parse_switch(struct tracey_parser *parser)
             tracey_parser_advance(parser);
             if (tracey_parser_check(parser, TRACEY_TOKEN_INTEGER))
             {
-                size_t i; size_t sz = 0;
-                for (i = 0; i < parser->current.lexeme_len; i++)
-                    sz = sz * 10 + (size_t)(parser->current.lexeme[i] - '0');
+                unsigned long long cv = 0;
+                struct tracey_token cvtok = parser->current;
+                if (!tracey_parse_int_literal(&cvtok, &cv))
+                    tracey_parser_error(parser, "Invalid case label", &cvtok);
                 tracey_parser_advance(parser);
                 if (tracey_parser_check(parser, TRACEY_TOKEN_COLON))
                     tracey_parser_advance(parser);
@@ -1272,7 +1354,7 @@ static struct tracey_stmt *tracey_parse_switch(struct tracey_parser *parser)
                     sw->as.switch_stmt.cases = nc;
                     sw->as.switch_stmt.case_cap = cap;
                 }
-                sw->as.switch_stmt.cases[sw->as.switch_stmt.case_count].value = (long)sz;
+                sw->as.switch_stmt.cases[sw->as.switch_stmt.case_count].value = (long)cv;
                 sw->as.switch_stmt.cases[sw->as.switch_stmt.case_count].has_value = true;
                 /* parse statements until next case/default/} */
                 {
@@ -1495,10 +1577,11 @@ static struct tracey_stmt *tracey_parse_var_decl_as_stmt(struct tracey_parser *p
         tracey_parser_advance(parser);
         if (tracey_parser_check(parser, TRACEY_TOKEN_INTEGER))
         {
-            size_t i; size_t sz = 0;
-            for (i = 0; i < parser->current.lexeme_len; i++)
-                sz = sz * 10 + (size_t)(parser->current.lexeme[i] - '0');
-            vd->as.var_decl_stmt.array_size = sz;
+            unsigned long long sv = 0;
+            struct tracey_token sztok = parser->current;
+            if (!tracey_parse_int_literal(&sztok, &sv))
+                tracey_parser_error(parser, "Invalid array size", &sztok);
+            vd->as.var_decl_stmt.array_size = (size_t)sv;
             tracey_parser_advance(parser);
         }
         if (!tracey_parser_expect(parser, TRACEY_TOKEN_RBRACKET, "expected ']'"))
@@ -1724,10 +1807,11 @@ static struct tracey_stmt *tracey_parse_statement(struct tracey_parser *parser)
             tracey_parser_advance(parser);
             if (tracey_parser_check(parser, TRACEY_TOKEN_INTEGER))
             {
-                size_t i; size_t sz = 0;
-                for (i = 0; i < parser->current.lexeme_len; i++)
-                    sz = sz * 10 + (size_t)(parser->current.lexeme[i] - '0');
-                vd->as.var_decl_stmt.array_size = sz;
+                unsigned long long sv = 0;
+                struct tracey_token sztok = parser->current;
+                if (!tracey_parse_int_literal(&sztok, &sv))
+                    tracey_parser_error(parser, "Invalid array size", &sztok);
+                vd->as.var_decl_stmt.array_size = (size_t)sv;
                 tracey_parser_advance(parser);
             }
             if (!tracey_parser_expect(parser, TRACEY_TOKEN_RBRACKET, "expected ']'"))
