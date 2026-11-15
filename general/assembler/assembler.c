@@ -1217,6 +1217,44 @@ static enum asm_encode_status asm_encode_line(struct asm_emit *e, const char *mn
         return ASM_ENCODE_OK;
     }
 
+    if (strcmp(mnemonic, "lsl") == 0 || strcmp(mnemonic, "lsr") == 0 ||
+        strcmp(mnemonic, "asr") == 0)
+    {
+        uint32_t base;
+
+        op_count = asm_split_operands(operands, ops, ASM_MAX_OPERANDS);
+        if (op_count < 3)
+            return asm_fail_operands(e, mnemonic);
+        if (!asm_parse_int(asm_slice_sub(ops[0], 1, ASM_NPOS), &rd) ||
+            !asm_parse_int(asm_slice_sub(ops[1], 1, ASM_NPOS), &rn) ||
+            !asm_parse_int(asm_slice_sub(ops[2], 1, ASM_NPOS), &rm))
+            return asm_fail_operands(e, mnemonic);
+        if (strcmp(mnemonic, "lsl") == 0)
+            base = 0x9AC02000u;
+        else if (strcmp(mnemonic, "lsr") == 0)
+            base = 0x9AC02400u;
+        else
+            base = 0x9AC02800u;
+        insn = base | (((uint32_t)rm & 0x1Fu) << 16) | (((uint32_t)rn & 0x1Fu) << 5) |
+               ((uint32_t)rd & 0x1Fu);
+        asm_emit_word(e, insn);
+        return ASM_ENCODE_OK;
+    }
+
+    if (strcmp(mnemonic, "mvn") == 0)
+    {
+        op_count = asm_split_operands(operands, ops, ASM_MAX_OPERANDS);
+        if (op_count < 2)
+            return asm_fail_operands(e, mnemonic);
+        if (!asm_parse_int(asm_slice_sub(ops[0], 1, ASM_NPOS), &rd) ||
+            !asm_parse_int(asm_slice_sub(ops[1], 1, ASM_NPOS), &rm))
+            return asm_fail_operands(e, mnemonic);
+        /* MVN Xd, Xm is ORN Xd, XZR, Xm. */
+        insn = 0xAA2003E0u | (((uint32_t)rm & 0x1Fu) << 16) | ((uint32_t)rd & 0x1Fu);
+        asm_emit_word(e, insn);
+        return ASM_ENCODE_OK;
+    }
+
     if (strcmp(mnemonic, "mov") == 0)
     {
         op_count = asm_split_operands(operands, ops, ASM_MAX_OPERANDS);
