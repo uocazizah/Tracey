@@ -68,10 +68,30 @@ TEST_CASE(parser_syntax_error_reported)
     CHECK_FALSE(parse_source("int main() { int x = ; }"));
 }
 
+TEST_CASE(parser_struct_definition_and_member_access)
+{
+    CHECK(parse_source("struct Point { int x; int y; }; "
+                       "int main() { struct Point p; p.x = 1; p.y = 2; return p.x + p.y; }"));
+}
+
+TEST_CASE(parser_struct_nested_member_access)
+{
+    CHECK(parse_source("struct Inner { int a; }; struct Outer { struct Inner in; }; "
+                       "int main() { struct Outer o; o.in.a = 5; return o.in.a; }"));
+}
+
+TEST_CASE(parser_unknown_struct_tag_reported)
+{
+    CHECK_FALSE(parse_source("int main() { struct Nope p; return 0; }"));
+}
+
 TEST_MAIN_BEGIN("parser")
     TEST_RUN(parser_empty_program);
     TEST_RUN(parser_simple_function);
     TEST_RUN(parser_var_decl_and_if);
     TEST_RUN(parser_while_and_call);
     TEST_RUN(parser_syntax_error_reported);
+    TEST_RUN(parser_struct_definition_and_member_access);
+    TEST_RUN(parser_struct_nested_member_access);
+    TEST_RUN(parser_unknown_struct_tag_reported);
 TEST_MAIN_END
