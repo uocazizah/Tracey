@@ -100,6 +100,26 @@ initializers, parameters, return values, and pointers are not supported yet,
 and every member occupies eight bytes because there is no packing or
 alignment analysis.
 
+## Function pointers
+
+```trc
+int add(int a, int b) { return a + b; }
+int mul(int a, int b) { return a * b; }
+
+int main()
+{
+    int (*op)(int, int);
+    op = add;
+    print(op(3, 4));   // 7
+    op = mul;
+    print(op(3, 4));   // 12
+    return 0;
+}
+```
+
+A function name decays to a function pointer value, so it can be passed to
+a function-pointer parameter as well.
+
 ## Manual toolchain
 
 If you want to drive the tools yourself:
