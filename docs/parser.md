@@ -20,7 +20,8 @@ statement      := var_decl | if_stmt | while_stmt | do_while_stmt
                  | switch_stmt | for_stmt | break_stmt
                  | continue_stmt | goto_stmt | label_stmt | return_stmt
                  | expr_stmt | block | ';'
-var_decl       := type IDENT ('[' INTEGER ']')? ('=' expression)? ';'
+var_decl       := type declarator ('[' INTEGER ']')? ('=' (expression | '{' expression (',' expression)* '}'))? ';'
+declarator     := IDENT | '(' '*' IDENT ')' '(' param_list? ')'
 if_stmt        := 'if' '(' expression ')' statement ('else' statement)?
 while_stmt     := 'while' '(' expression ')' statement
 do_while_stmt  := 'do' statement 'while' '(' expression ')' ';'
@@ -73,8 +74,13 @@ Notes:
 - `struct` definitions may appear only at file scope (`struct Point { ... };`).
   A struct tag must be defined before it is used, and struct members may be
   scalars or other struct types, but not arrays or pointers. Struct-typed
-  expressions support member access (`p.x`, `o.in.a`); struct arrays,
-  initializers, parameters, return values, and pointers are rejected.
+  expressions support member access (`p.x`, `o.in.a`), fixed-size arrays of
+  structs (`a[i].x`), and positional brace initializers. Struct parameters,
+  return values, and pointers are not supported yet.
+- Function pointers use the `int (*name)(int, int)` declarator and may be
+  called through the variable. A bare function name decays to a function
+  pointer value. Function-pointer parameters are supported; return values
+  and typedefs of function pointers are not.
 - Unions, enums, and function pointers are not supported.
 
 ## AST
