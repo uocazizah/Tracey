@@ -34,6 +34,103 @@ void tracey_program_init(struct tracey_program *program)
         return;
     program->functions = NULL;
     program->function_count = 0;
+    program->structs = NULL;
+    program->struct_count = 0;
+    program->struct_cap = 0;
+}
+
+int tracey_program_add_struct(struct tracey_program *program, const char *name)
+{
+    struct tracey_struct_def *def;
+
+    if (program == NULL || name == NULL)
+        return -1;
+    if (program->struct_count == program->struct_cap)
+    {
+        size_t cap = program->struct_cap ? program->struct_cap * 2 : 8;
+        struct tracey_struct_def *p =
+            (struct tracey_struct_def *)realloc(program->structs, cap * sizeof(*p));
+        if (p == NULL)
+            return -1;
+        memset(p + program->struct_cap, 0, (cap - program->struct_cap) * sizeof(*p));
+        program->structs = p;
+        program->struct_cap = cap;
+    }
+    def = &program->structs[program->struct_count];
+    def->name = strdup(name);
+    if (def->name == NULL)
+        return -1;
+    def->members = NULL;
+    def->member_count = 0;
+    def->member_cap = 0;
+    def->size = 0;
+    return (int)program->struct_count++;
+}
+
+struct tracey_struct_def *tracey_program_find_struct(const struct tracey_program *program,
+                                                     const char *name)
+{
+    size_t i;
+
+    if (program == NULL || name == NULL)
+        return NULL;
+    for (i = 0; i < program->struct_count; i++)
+    {
+        if (program->structs[i].name != NULL && strcmp(program->structs[i].name, name) == 0)
+            return (struct tracey_struct_def *)&program->structs[i];
+    }
+    return NULL;
+}
+
+int tracey_program_find_struct_id(const struct tracey_program *program, const char *name)
+{
+    size_t i;
+
+    if (program == NULL || name == NULL)
+        return -1;
+    for (i = 0; i < program->struct_count; i++)
+    {
+        if (program->structs[i].name != NULL && strcmp(program->structs[i].name, name) == 0)
+            return (int)i;
+    }
+    return -1;
+}
+
+bool tracey_struct_add_member(struct tracey_struct_def *def, const char *name,
+                              enum tracey_type_kind type, int struct_id, size_t size)
+{
+    size_t i;
+    size_t padded;
+
+    if (def == NULL || name == NULL || size == 0)
+        return false;
+    for (i = 0; i < def->member_count; i++)
+    {
+        if (def->members[i].name != NULL && strcmp(def->members[i].name, name) == 0)
+            return false;
+    }
+    if (def->member_count == def->member_cap)
+    {
+        size_t cap = def->member_cap ? def->member_cap * 2 : 8;
+        struct tracey_struct_member *p =
+            (struct tracey_struct_member *)realloc(def->members, cap * sizeof(*p));
+        if (p == NULL)
+            return false;
+        def->members = p;
+        def->member_cap = cap;
+    }
+    def->members[def->member_count].type = type;
+    def->members[def->member_count].struct_id = struct_id;
+    def->members[def->member_count].name = strdup(name);
+    if (def->members[def->member_count].name == NULL)
+        return false;
+    def->members[def->member_count].offset = def->size;
+    def->member_count++;
+    padded = size;
+    if (padded % 8 != 0)
+        padded += 8 - (padded % 8);
+    def->size += padded;
+    return true;
 }
 
 void tracey_expr_destroy(struct tracey_expr *expr)
@@ -85,6 +182,10 @@ void tracey_expr_destroy(struct tracey_expr *expr)
             tracey_expr_destroy(expr->as.ternary_expr.then_branch);
             tracey_expr_destroy(expr->as.ternary_expr.else_branch);
             break;
+        case TRACEY_EXPR_MEMBER:
+            tracey_expr_destroy(expr->as.member_expr.base);
+            free(expr->as.member_expr.field);
+            break;
         default:
             break;
     }
@@ -122,6 +223,20 @@ void tracey_stmt_destroy(struct tracey_stmt *stmt)
             tracey_expr_destroy(stmt->as.while_stmt.condition);
             tracey_stmt_destroy(stmt->as.while_stmt.body);
             break;
+        case TRACEY_STMT_DO_WHILE:
+            tracey_stmt_destroy(stmt->as.do_while_stmt.body);
+            tracey_expr_destroy(stmt->as.do_while_stmt.condition);
+            break;
+        case TRACEY_STMT_SWITCH:
+        {
+            size_t ci;
+            tracey_expr_destroy(stmt->as.switch_stmt.condition);
+            for (ci = 0; ci < stmt->as.switch_stmt.case_count; ci++)
+                tracey_stmt_destroy(stmt->as.switch_stmt.cases[ci].body);
+            free(stmt->as.switch_stmt.cases);
+            tracey_stmt_destroy(stmt->as.switch_stmt.default_body);
+            break;
+        }
         case TRACEY_STMT_FOR:
             tracey_stmt_destroy(stmt->as.for_stmt.init);
             tracey_expr_destroy(stmt->as.for_stmt.condition);
@@ -175,4 +290,18 @@ void tracey_program_free(struct tracey_program *program)
     free(program->functions);
     program->functions = NULL;
     program->function_count = 0;
+
+    for (i = 0; i < program->struct_count; i++)
+    {
+        size_t m;
+
+        free(program->structs[i].name);
+        for (m = 0; m < program->structs[i].member_count; m++)
+            free(program->structs[i].members[m].name);
+        free(program->structs[i].members);
+    }
+    free(program->structs);
+    program->structs = NULL;
+    program->struct_count = 0;
+    program->struct_cap = 0;
 }
