@@ -20,7 +20,9 @@ are represented as pointers to their element type. Basic `typedef` aliases
 are resolved by the parser to one of these types before analysis, so they
 introduce no new type. A file-scope `struct` definition introduces a struct
 value type; a symbol of that type records the index of the resolved
-definition, which member access uses to find member types.
+definition, which member access uses to find member types. A function
+pointer type records the pointee's return type and parameter types in a
+`tracey_func_sig`.
 
 ## Checks performed
 
@@ -47,8 +49,13 @@ definition, which member access uses to find member types.
 - `goto` labels must be declared and used (within a function).
 - Array indices must be `int`.
 - Struct member access requires a struct value and resolves the member name in
-  the corresponding struct definition. Struct arrays, struct initializers, and
-  compound assignment to a struct member are rejected.
+  the corresponding struct definition. Fixed-size arrays of structs and
+  positional brace initializers are supported; compound assignment to a struct
+  member is rejected, and struct parameters, return values, and pointers are
+  not supported.
+- A bare function name decays to a function pointer value. Calls through a
+  function-pointer variable check arity and parameter types against the
+  recorded signature.
 
 ## Global functions
 
