@@ -1435,6 +1435,18 @@ static enum asm_encode_status asm_encode_line(struct asm_emit *e, const char *mn
         return ASM_ENCODE_OK;
     }
 
+    if (strcmp(mnemonic, "br") == 0 || strcmp(mnemonic, "blr") == 0)
+    {
+        uint32_t base = strcmp(mnemonic, "blr") == 0 ? 0xD63F0000u : 0xD61F0000u;
+
+        op_count = asm_split_operands(operands, ops, ASM_MAX_OPERANDS);
+        if (op_count < 1)
+            return asm_fail_operands(e, mnemonic);
+        rn = asm_regnum(ops[0]);
+        asm_emit_word(e, base | (((uint32_t)rn & 0x1Fu) << 5));
+        return ASM_ENCODE_OK;
+    }
+
     if (strncmp(mnemonic, "b.", 2) == 0)
     {
         struct asm_slice target = asm_slice_trim(operands);
