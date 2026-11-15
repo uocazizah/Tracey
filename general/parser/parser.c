@@ -1,5 +1,6 @@
 #include "tracey/parser.h"
 
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -76,6 +77,15 @@ void tracey_parser_free(struct tracey_parser *parser)
         free(parser->errors[i].message);
     free(parser->errors);
     parser->errors = NULL;
+    for (i = 0; i < parser->typedef_count; i++)
+        free(parser->typedef_names[i]);
+    free(parser->typedef_names);
+    free(parser->typedef_types);
+    parser->typedef_names = NULL;
+    parser->typedef_types = NULL;
+    parser->typedef_count = 0;
+    parser->typedef_cap = 0;
+
     parser->error_count = 0;
     parser->error_cap = 0;
     parser->had_error = false;
@@ -133,8 +143,104 @@ static void tracey_parser_synchronize(struct tracey_parser *parser)
     }
 }
 
+static bool tracey_parser_is_typedef_alias(const struct tracey_parser *parser)
+{
+    if (!parser->has_current || parser->current.type != TRACEY_TOKEN_IDENTIFIER)
+        return false;
+    for (size_t _ti = 0; _ti < parser->typedef_count; _ti++)
+    {
+        if (strlen(parser->typedef_names[_ti]) == parser->current.lexeme_len &&
+            memcmp(parser->typedef_names[_ti], parser->current.lexeme, parser->current.lexeme_len) == 0)
+            return true;
+    }
+    return false;
+}
+
+static enum tracey_type_kind tracey_parse_type_ex(struct tracey_parser *parser,
+                                                  int *out_struct_id);
+
 static enum tracey_type_kind tracey_parse_type(struct tracey_parser *parser)
 {
+    return tracey_parse_type_ex(parser, NULL);
+}
+
+/*
+ * tracey_parse_type_ex - parse a type specifier.
+ *
+ * Returns the scalar type kind. When the type is a struct value type, the
+ * function returns TRACEY_TYPE_STRUCT and, if out_struct_id is not NULL,
+ * stores the index of the struct definition selected by the tag.
+ * out_struct_id is set to -1 for every non-struct type. An unknown struct
+ * tag is reported as an error and yields -1 as well.
+ *
+ * Pointers to struct types are not supported yet; a '*' after a struct tag
+ * is reported as an error.
+ */
+static enum tracey_type_kind tracey_parse_type_ex(struct tracey_parser *parser,
+                                                  int *out_struct_id)
+{
+    if (out_struct_id != NULL)
+        *out_struct_id = -1;
+
+    if (tracey_parser_check(parser, TRACEY_TOKEN_KEYWORD_STRUCT))
+    {
+        char *tag;
+        int sid;
+
+        tracey_parser_advance(parser); /* struct */
+        if (!tracey_parser_check(parser, TRACEY_TOKEN_IDENTIFIER))
+        {
+            tracey_parser_error(parser, "Expected struct tag name", &parser->current);
+            return TRACEY_TYPE_INT;
+        }
+        tag = tracey_token_strdup(&parser->current);
+        tracey_parser_advance(parser);
+        sid = tracey_program_find_struct_id(parser->program, tag);
+        if (sid < 0)
+        {
+            char buf[256];
+            snprintf(buf, sizeof(buf), "Unknown struct type '%s'", tag ? tag : "");
+            tracey_parser_error(parser, buf, &parser->current);
+        }
+        free(tag);
+        if (tracey_parser_check(parser, TRACEY_TOKEN_STAR))
+        {
+            tracey_parser_error(parser, "Pointers to struct types are not supported yet",
+                                &parser->current);
+            tracey_parser_advance(parser);
+        }
+        if (out_struct_id != NULL)
+            *out_struct_id = sid;
+        return TRACEY_TYPE_STRUCT;
+    }
+
+    /* Typedef alias. */
+    if (tracey_parser_check(parser, TRACEY_TOKEN_IDENTIFIER))
+    {
+        for (size_t _ti = 0; _ti < parser->typedef_count; _ti++)
+        {
+            if (strlen(parser->typedef_names[_ti]) == parser->current.lexeme_len &&
+                memcmp(parser->typedef_names[_ti], parser->current.lexeme, parser->current.lexeme_len) == 0)
+            {
+                enum tracey_type_kind _t = parser->typedef_types[_ti];
+                tracey_parser_advance(parser);
+                if (tracey_parser_check(parser, TRACEY_TOKEN_STAR))
+                {
+                    tracey_parser_advance(parser);
+                    switch (_t)
+                    {
+                        case TRACEY_TYPE_INT: return TRACEY_TYPE_INT_PTR;
+                        case TRACEY_TYPE_CHAR: return TRACEY_TYPE_CHAR_PTR;
+                        case TRACEY_TYPE_FLOAT: return TRACEY_TYPE_FLOAT_PTR;
+                        case TRACEY_TYPE_DOUBLE: return TRACEY_TYPE_DOUBLE_PTR;
+                        default: return _t;
+                    }
+                }
+                return _t;
+            }
+        }
+    }
+
     bool is_unsigned = false;
     int long_count = 0;   /* 0 = none, 1 = long, 2 = long long */
     bool is_short = false;
@@ -510,6 +616,71 @@ static struct tracey_expr *tracey_parse_primary(struct tracey_parser *parser)
 
 static struct tracey_expr *tracey_parse_unary(struct tracey_parser *parser)
 {
+    if (tracey_parser_check(parser, TRACEY_TOKEN_KEYWORD_SIZEOF))
+    {
+        struct tracey_source_loc loc = {parser->current.line, parser->current.column};
+        tracey_parser_advance(parser);
+        if (tracey_parser_check(parser, TRACEY_TOKEN_LPAREN))
+        {
+            tracey_parser_advance(parser); /* consume '(' */
+            if (tracey_parser_check(parser, TRACEY_TOKEN_KEYWORD_INT) ||
+                tracey_parser_check(parser, TRACEY_TOKEN_KEYWORD_CHAR) ||
+                tracey_parser_check(parser, TRACEY_TOKEN_KEYWORD_SHORT) ||
+                tracey_parser_check(parser, TRACEY_TOKEN_KEYWORD_LONG) ||
+                tracey_parser_check(parser, TRACEY_TOKEN_KEYWORD_FLOAT) ||
+                tracey_parser_check(parser, TRACEY_TOKEN_KEYWORD_DOUBLE) ||
+                tracey_parser_check(parser, TRACEY_TOKEN_KEYWORD_BOOL) ||
+                tracey_parser_check(parser, TRACEY_TOKEN_KEYWORD_VOID) ||
+                tracey_parser_check(parser, TRACEY_TOKEN_KEYWORD_UNSIGNED) ||
+                tracey_parser_check(parser, TRACEY_TOKEN_KEYWORD_SIGNED) ||
+                tracey_parser_check(parser, TRACEY_TOKEN_KEYWORD_SIZE_T))
+            {
+                (void)tracey_parse_type(parser);
+            }
+            else
+            {
+                struct tracey_expr *e = tracey_parse_expression(parser);
+                tracey_expr_destroy(e);
+            }
+            tracey_parser_expect(parser, TRACEY_TOKEN_RPAREN, "expected ')'");
+        }
+        else
+        {
+            struct tracey_expr *e = tracey_parse_unary(parser);
+            tracey_expr_destroy(e);
+        }
+        {
+            struct tracey_expr *e = tracey_expr_create(TRACEY_EXPR_INT, loc);
+            if (e) e->as.int_expr.value = 8;
+            return e;
+        }
+    }
+    if (tracey_parser_check(parser, TRACEY_TOKEN_PLUS_PLUS))
+    {
+        struct tracey_source_loc loc = {parser->current.line, parser->current.column};
+        struct tracey_expr *opnd, *e;
+        tracey_parser_advance(parser);
+        opnd = tracey_parse_unary(parser);
+        if (!opnd) return NULL;
+        e = tracey_expr_create(TRACEY_EXPR_UNARY, loc);
+        if (!e) { tracey_expr_destroy(opnd); return NULL; }
+        e->as.unary_expr.op = TRACEY_UNARY_PRE_INC;
+        e->as.unary_expr.operand = opnd;
+        return e;
+    }
+    if (tracey_parser_check(parser, TRACEY_TOKEN_MINUS_MINUS))
+    {
+        struct tracey_source_loc loc = {parser->current.line, parser->current.column};
+        struct tracey_expr *opnd, *e;
+        tracey_parser_advance(parser);
+        opnd = tracey_parse_unary(parser);
+        if (!opnd) return NULL;
+        e = tracey_expr_create(TRACEY_EXPR_UNARY, loc);
+        if (!e) { tracey_expr_destroy(opnd); return NULL; }
+        e->as.unary_expr.op = TRACEY_UNARY_PRE_DEC;
+        e->as.unary_expr.operand = opnd;
+        return e;
+    }
     if (tracey_parser_check(parser, TRACEY_TOKEN_MINUS))
     {
         struct tracey_source_loc loc = {parser->current.line, parser->current.column};
@@ -576,19 +747,64 @@ static struct tracey_expr *tracey_parse_unary(struct tracey_parser *parser)
 
     {
         struct tracey_expr *primary = tracey_parse_primary(parser);
-        while (primary && tracey_parser_check(parser, TRACEY_TOKEN_LBRACKET))
+        /*
+         * Postfix loop: subscript and member access bind left to right at the
+         * same precedence, so both are handled here before ++/--.
+         */
+        while (primary && (tracey_parser_check(parser, TRACEY_TOKEN_LBRACKET) ||
+                           tracey_parser_check(parser, TRACEY_TOKEN_DOT)))
         {
-            struct tracey_expr *idx, *node;
+            if (tracey_parser_check(parser, TRACEY_TOKEN_LBRACKET))
+            {
+                struct tracey_expr *idx, *node;
+                tracey_parser_advance(parser);
+                idx = tracey_parse_expression(parser);
+                if (!idx) { tracey_expr_destroy(primary); return NULL; }
+                if (!tracey_parser_expect(parser, TRACEY_TOKEN_RBRACKET, "expected ']'"))
+                { tracey_expr_destroy(idx); tracey_expr_destroy(primary); return NULL; }
+                node = tracey_expr_create(TRACEY_EXPR_INDEX, primary->loc);
+                if (!node) { tracey_expr_destroy(idx); tracey_expr_destroy(primary); return NULL; }
+                node->as.index_expr.base = primary;
+                node->as.index_expr.index = idx;
+                primary = node;
+            }
+            else
+            {
+                struct tracey_expr *node;
+                tracey_parser_advance(parser); /* '.' */
+                if (!tracey_parser_check(parser, TRACEY_TOKEN_IDENTIFIER))
+                {
+                    tracey_parser_error(parser, "Expected member name after '.'", &parser->current);
+                    tracey_expr_destroy(primary);
+                    return NULL;
+                }
+                node = tracey_expr_create(TRACEY_EXPR_MEMBER, primary->loc);
+                if (!node) { tracey_expr_destroy(primary); return NULL; }
+                node->as.member_expr.base = primary;
+                node->as.member_expr.field = tracey_token_strdup(&parser->current);
+                tracey_parser_advance(parser);
+                primary = node;
+            }
+        }
+        if (primary && tracey_parser_check(parser, TRACEY_TOKEN_PLUS_PLUS))
+        {
+            struct tracey_source_loc loc = primary->loc;
+            struct tracey_expr *e = tracey_expr_create(TRACEY_EXPR_UNARY, loc);
             tracey_parser_advance(parser);
-            idx = tracey_parse_expression(parser);
-            if (!idx) { tracey_expr_destroy(primary); return NULL; }
-            if (!tracey_parser_expect(parser, TRACEY_TOKEN_RBRACKET, "expected ']'"))
-            { tracey_expr_destroy(idx); tracey_expr_destroy(primary); return NULL; }
-            node = tracey_expr_create(TRACEY_EXPR_INDEX, primary->loc);
-            if (!node) { tracey_expr_destroy(idx); tracey_expr_destroy(primary); return NULL; }
-            node->as.index_expr.base = primary;
-            node->as.index_expr.index = idx;
-            primary = node;
+            if (!e) { tracey_expr_destroy(primary); return NULL; }
+            e->as.unary_expr.op = TRACEY_UNARY_POST_INC;
+            e->as.unary_expr.operand = primary;
+            return e;
+        }
+        if (primary && tracey_parser_check(parser, TRACEY_TOKEN_MINUS_MINUS))
+        {
+            struct tracey_source_loc loc = primary->loc;
+            struct tracey_expr *e = tracey_expr_create(TRACEY_EXPR_UNARY, loc);
+            tracey_parser_advance(parser);
+            if (!e) { tracey_expr_destroy(primary); return NULL; }
+            e->as.unary_expr.op = TRACEY_UNARY_POST_DEC;
+            e->as.unary_expr.operand = primary;
+            return e;
         }
         return primary;
     }
@@ -770,7 +986,8 @@ static struct tracey_expr *tracey_parse_logical_or(struct tracey_parser *parser)
 static bool tracey_is_assignable(const struct tracey_expr *e)
 {
     if (e == NULL) return false;
-    return e->kind == TRACEY_EXPR_IDENT || e->kind == TRACEY_EXPR_INDEX || e->kind == TRACEY_EXPR_DEREF;
+    return e->kind == TRACEY_EXPR_IDENT || e->kind == TRACEY_EXPR_INDEX ||
+           e->kind == TRACEY_EXPR_DEREF || e->kind == TRACEY_EXPR_MEMBER;
 }
 
 static struct tracey_expr *tracey_parse_assignment(struct tracey_parser *parser)
@@ -1000,9 +1217,263 @@ fail:
     return NULL;
 }
 
+static struct tracey_stmt *tracey_parse_do(struct tracey_parser *parser)
+{
+    struct tracey_source_loc loc = {parser->current.line, parser->current.column};
+    struct tracey_stmt *s = tracey_stmt_create(TRACEY_STMT_DO_WHILE, loc);
+    if (!s) return NULL;
+    tracey_parser_advance(parser);
+    s->as.do_while_stmt.body = tracey_parse_statement(parser);
+    if (!s->as.do_while_stmt.body) goto fail;
+    if (!tracey_parser_expect(parser, TRACEY_TOKEN_KEYWORD_WHILE, "expected 'while'")) goto fail;
+    if (!tracey_parser_expect(parser, TRACEY_TOKEN_LPAREN, "expected '('")) goto fail;
+    s->as.do_while_stmt.condition = tracey_parse_expression(parser);
+    if (!s->as.do_while_stmt.condition) goto fail;
+    if (!tracey_parser_expect(parser, TRACEY_TOKEN_RPAREN, "expected ')'")) goto fail;
+    if (!tracey_parser_expect(parser, TRACEY_TOKEN_SEMICOLON, "expected ';'")) goto fail;
+    return s;
+fail:
+    tracey_stmt_destroy(s);
+    return NULL;
+}
+
+static struct tracey_stmt *tracey_parse_switch(struct tracey_parser *parser)
+{
+    struct tracey_source_loc loc = {parser->current.line, parser->current.column};
+    struct tracey_stmt *sw;
+    tracey_parser_advance(parser); /* switch */
+    if (!tracey_parser_expect(parser, TRACEY_TOKEN_LPAREN, "expected '('")) return NULL;
+    sw = tracey_stmt_create(TRACEY_STMT_SWITCH, loc);
+    if (!sw) return NULL;
+    sw->as.switch_stmt.condition = tracey_parse_expression(parser);
+    if (!sw->as.switch_stmt.condition) { tracey_stmt_destroy(sw); return NULL; }
+    if (!tracey_parser_expect(parser, TRACEY_TOKEN_RPAREN, "expected ')'")) { tracey_stmt_destroy(sw); return NULL; }
+    if (!tracey_parser_expect(parser, TRACEY_TOKEN_LBRACE, "expected '{'")) { tracey_stmt_destroy(sw); return NULL; }
+
+    while (parser->has_current && parser->current.type != TRACEY_TOKEN_RBRACE &&
+           parser->current.type != TRACEY_TOKEN_EOF)
+    {
+        if (tracey_parser_check(parser, TRACEY_TOKEN_KEYWORD_CASE))
+        {
+            tracey_parser_advance(parser);
+            if (tracey_parser_check(parser, TRACEY_TOKEN_INTEGER))
+            {
+                size_t i; size_t sz = 0;
+                for (i = 0; i < parser->current.lexeme_len; i++)
+                    sz = sz * 10 + (size_t)(parser->current.lexeme[i] - '0');
+                tracey_parser_advance(parser);
+                if (tracey_parser_check(parser, TRACEY_TOKEN_COLON))
+                    tracey_parser_advance(parser);
+                if (sw->as.switch_stmt.case_count == sw->as.switch_stmt.case_cap)
+                {
+                    size_t cap = sw->as.switch_stmt.case_cap ? sw->as.switch_stmt.case_cap * 2 : 8;
+                    struct tracey_switch_case *nc = (struct tracey_switch_case *)realloc(sw->as.switch_stmt.cases, cap * sizeof(*nc));
+                    if (!nc) { tracey_stmt_destroy(sw); return NULL; }
+                    sw->as.switch_stmt.cases = nc;
+                    sw->as.switch_stmt.case_cap = cap;
+                }
+                sw->as.switch_stmt.cases[sw->as.switch_stmt.case_count].value = (long)sz;
+                sw->as.switch_stmt.cases[sw->as.switch_stmt.case_count].has_value = true;
+                /* parse statements until next case/default/} */
+                {
+                    struct tracey_stmt *blk = tracey_stmt_create(TRACEY_STMT_BLOCK, loc);
+                    if (!blk) { tracey_stmt_destroy(sw); return NULL; }
+                    while (parser->has_current && parser->current.type != TRACEY_TOKEN_RBRACE &&
+                           parser->current.type != TRACEY_TOKEN_KEYWORD_CASE &&
+                           parser->current.type != TRACEY_TOKEN_KEYWORD_DEFAULT &&
+                           parser->current.type != TRACEY_TOKEN_EOF)
+                    {
+                        struct tracey_stmt *st = tracey_parse_statement(parser);
+                        if (st)
+                        {
+                            if (!tracey_block_push(&blk->as.block_stmt, st)) { tracey_stmt_destroy(st); tracey_stmt_destroy(blk); tracey_stmt_destroy(sw); return NULL; }
+                        }
+                        else
+                        {
+                            tracey_parser_synchronize(parser);
+                            if (tracey_parser_check(parser, TRACEY_TOKEN_SEMICOLON))
+                                tracey_parser_advance(parser);
+                        }
+                    }
+                    sw->as.switch_stmt.cases[sw->as.switch_stmt.case_count].body = blk;
+                    sw->as.switch_stmt.case_count++;
+                }
+            }
+            else
+            {
+                tracey_stmt_destroy(sw);
+                return NULL;
+            }
+        }
+        else if (tracey_parser_check(parser, TRACEY_TOKEN_KEYWORD_DEFAULT))
+        {
+            tracey_parser_advance(parser);
+            if (tracey_parser_check(parser, TRACEY_TOKEN_COLON))
+                tracey_parser_advance(parser);
+            {
+                struct tracey_stmt *blk = tracey_stmt_create(TRACEY_STMT_BLOCK, loc);
+                if (!blk) { tracey_stmt_destroy(sw); return NULL; }
+                while (parser->has_current && parser->current.type != TRACEY_TOKEN_RBRACE &&
+                       parser->current.type != TRACEY_TOKEN_KEYWORD_CASE &&
+                       parser->current.type != TRACEY_TOKEN_EOF)
+                {
+                    struct tracey_stmt *st = tracey_parse_statement(parser);
+                    if (st)
+                    {
+                        if (!tracey_block_push(&blk->as.block_stmt, st)) { tracey_stmt_destroy(st); tracey_stmt_destroy(blk); tracey_stmt_destroy(sw); return NULL; }
+                    }
+                    else
+                    {
+                        tracey_parser_synchronize(parser);
+                        if (tracey_parser_check(parser, TRACEY_TOKEN_SEMICOLON))
+                            tracey_parser_advance(parser);
+                    }
+                }
+                sw->as.switch_stmt.default_body = blk;
+            }
+        }
+        else
+        {
+            break;
+        }
+    }
+    tracey_parser_expect(parser, TRACEY_TOKEN_RBRACE, "expected '}'");
+    return sw;
+}
+
+/*
+ * tracey_parse_struct_definition - parse a file-scope struct declaration.
+ *
+ * The current token must be the struct keyword. The function registers the
+ * tag with parser->program, parses the brace-enclosed member list, and
+ * consumes the trailing semicolon. Members are limited to scalar and struct
+ * value types; a member may not be an array or a pointer.
+ *
+ * Returns true when the definition and its terminating semicolon were
+ * consumed, or false after reporting an error. On failure the caller
+ * synchronizes at the statement level; a partially built definition may
+ * remain registered in the program.
+ */
+static bool tracey_parse_struct_definition(struct tracey_parser *parser)
+{
+    char *tag;
+    int sid;
+
+    tracey_parser_advance(parser); /* struct */
+    if (!tracey_parser_check(parser, TRACEY_TOKEN_IDENTIFIER))
+    {
+        tracey_parser_error(parser, "Expected struct tag name", &parser->current);
+        return false;
+    }
+    tag = tracey_token_strdup(&parser->current);
+    tracey_parser_advance(parser);
+
+    if (!tracey_parser_expect(parser, TRACEY_TOKEN_LBRACE, "expected '{'"))
+    {
+        free(tag);
+        return false;
+    }
+
+    sid = tracey_program_add_struct(parser->program, tag);
+    free(tag);
+    if (sid < 0)
+        return false;
+
+    while (parser->has_current && parser->current.type != TRACEY_TOKEN_RBRACE &&
+           parser->current.type != TRACEY_TOKEN_EOF)
+    {
+        int member_sid = -1;
+        enum tracey_type_kind mt;
+
+        if (tracey_parser_check(parser, TRACEY_TOKEN_SEMICOLON))
+        {
+            tracey_parser_advance(parser);
+            continue;
+        }
+
+        mt = tracey_parse_type_ex(parser, &member_sid);
+        if (!tracey_parser_check(parser, TRACEY_TOKEN_IDENTIFIER))
+        {
+            tracey_parser_error(parser, "Expected struct member name", &parser->current);
+            tracey_parser_synchronize(parser);
+            continue;
+        }
+        {
+            struct tracey_token name_tok = parser->current;
+            char *mname = tracey_token_strdup(&name_tok);
+            size_t msize = 8;
+
+            if (mt == TRACEY_TYPE_STRUCT && member_sid >= 0 &&
+                (size_t)member_sid < parser->program->struct_count)
+                msize = parser->program->structs[member_sid].size;
+
+            if (!tracey_struct_add_member(&parser->program->structs[sid], mname, mt,
+                                          member_sid, msize))
+            {
+                char buf[256];
+                snprintf(buf, sizeof(buf), "Duplicate struct member '%s'", mname ? mname : "");
+                tracey_parser_error(parser, buf, &name_tok);
+            }
+            free(mname);
+        }
+        tracey_parser_advance(parser);
+        if (!tracey_parser_expect(parser, TRACEY_TOKEN_SEMICOLON, "expected ';' after member"))
+            tracey_parser_synchronize(parser);
+    }
+
+    if (!tracey_parser_expect(parser, TRACEY_TOKEN_RBRACE, "expected '}'"))
+        return false;
+    if (!tracey_parser_expect(parser, TRACEY_TOKEN_SEMICOLON, "expected ';' after struct definition"))
+        return false;
+    return true;
+}
+
+static bool tracey_parser_add_typedef(struct tracey_parser *parser, const char *name,
+                                         enum tracey_type_kind type)
+{
+    if (parser->typedef_count == parser->typedef_cap)
+    {
+        size_t cap = parser->typedef_cap ? parser->typedef_cap * 2 : 8;
+        char **nn = (char **)realloc(parser->typedef_names, cap * sizeof(*nn));
+        enum tracey_type_kind *tt = (enum tracey_type_kind *)realloc(parser->typedef_types, cap * sizeof(*tt));
+        if (!nn || !tt) return false;
+        parser->typedef_names = nn;
+        parser->typedef_types = tt;
+        parser->typedef_cap = cap;
+    }
+    parser->typedef_names[parser->typedef_count] = strdup(name);
+    parser->typedef_types[parser->typedef_count] = type;
+    parser->typedef_count++;
+    return true;
+}
+
+static bool tracey_parse_typedef(struct tracey_parser *parser)
+{
+    enum tracey_type_kind t;
+    struct tracey_token name_tok;
+    tracey_parser_advance(parser); /* typedef */
+    t = tracey_parse_type(parser);
+    if (!tracey_parser_check(parser, TRACEY_TOKEN_IDENTIFIER))
+    {
+        tracey_parser_error(parser, "Expected typedef name", &parser->current);
+        return false;
+    }
+    name_tok = parser->current;
+    {
+        char *nm = tracey_token_strdup(&name_tok);
+        tracey_parser_add_typedef(parser, nm, t);
+        free(nm);
+    }
+    tracey_parser_advance(parser);
+    if (!tracey_parser_expect(parser, TRACEY_TOKEN_SEMICOLON, "expected ';'"))
+        return false;
+    return true;
+}
+
 static struct tracey_stmt *tracey_parse_var_decl_as_stmt(struct tracey_parser *parser)
 {
-    enum tracey_type_kind t = tracey_parse_type(parser);
+    int struct_id = -1;
+    enum tracey_type_kind t = tracey_parse_type_ex(parser, &struct_id);
     struct tracey_token name_tok;
     struct tracey_stmt *vd;
 
@@ -1016,6 +1487,7 @@ static struct tracey_stmt *tracey_parse_var_decl_as_stmt(struct tracey_parser *p
         (struct tracey_source_loc){name_tok.line, name_tok.column});
     if (!vd) return NULL;
     vd->as.var_decl_stmt.type = t;
+    vd->as.var_decl_stmt.struct_id = struct_id;
     vd->as.var_decl_stmt.name = tracey_token_strdup(&name_tok);
     tracey_parser_advance(parser);
     if (tracey_parser_check(parser, TRACEY_TOKEN_LBRACKET))
@@ -1063,7 +1535,8 @@ static struct tracey_stmt *tracey_parse_for(struct tracey_parser *parser)
              tracey_parser_check(parser, TRACEY_TOKEN_KEYWORD_FLOAT) ||
              tracey_parser_check(parser, TRACEY_TOKEN_KEYWORD_DOUBLE) ||
              tracey_parser_check(parser, TRACEY_TOKEN_KEYWORD_VOID) ||
-             tracey_parser_check(parser, TRACEY_TOKEN_KEYWORD_SIZE_T))
+             tracey_parser_check(parser, TRACEY_TOKEN_KEYWORD_SIZE_T) ||
+             tracey_parser_check(parser, TRACEY_TOKEN_KEYWORD_STRUCT))
     {
         s->as.for_stmt.init = tracey_parse_var_decl_as_stmt(parser);
         if (!s->as.for_stmt.init) goto fail;
@@ -1202,6 +1675,10 @@ static struct tracey_stmt *tracey_parse_statement(struct tracey_parser *parser)
         return tracey_parse_if(parser);
     if (tracey_parser_check(parser, TRACEY_TOKEN_KEYWORD_WHILE))
         return tracey_parse_while(parser);
+    if (tracey_parser_check(parser, TRACEY_TOKEN_KEYWORD_DO))
+        return tracey_parse_do(parser);
+    if (tracey_parser_check(parser, TRACEY_TOKEN_KEYWORD_SWITCH))
+        return tracey_parse_switch(parser);
     if (tracey_parser_check(parser, TRACEY_TOKEN_KEYWORD_FOR))
         return tracey_parse_for(parser);
     if (tracey_parser_check(parser, TRACEY_TOKEN_KEYWORD_BREAK))
@@ -1222,9 +1699,12 @@ static struct tracey_stmt *tracey_parse_statement(struct tracey_parser *parser)
         tracey_parser_check(parser, TRACEY_TOKEN_KEYWORD_SHORT) ||
         tracey_parser_check(parser, TRACEY_TOKEN_KEYWORD_UNSIGNED) ||
         tracey_parser_check(parser, TRACEY_TOKEN_KEYWORD_SIGNED) ||
-        tracey_parser_check(parser, TRACEY_TOKEN_KEYWORD_SIZE_T))
+        tracey_parser_check(parser, TRACEY_TOKEN_KEYWORD_SIZE_T) ||
+        tracey_parser_check(parser, TRACEY_TOKEN_KEYWORD_STRUCT) ||
+        tracey_parser_is_typedef_alias(parser))
     {
-        enum tracey_type_kind t = tracey_parse_type(parser);
+        int struct_id = -1;
+        enum tracey_type_kind t = tracey_parse_type_ex(parser, &struct_id);
         struct tracey_token name_tok;
         struct tracey_stmt *vd;
         if (!tracey_parser_check(parser, TRACEY_TOKEN_IDENTIFIER))
@@ -1236,6 +1716,7 @@ static struct tracey_stmt *tracey_parse_statement(struct tracey_parser *parser)
         vd = tracey_stmt_create(TRACEY_STMT_VAR_DECL, (struct tracey_source_loc){name_tok.line, name_tok.column});
         if (!vd) return NULL;
         vd->as.var_decl_stmt.type = t;
+        vd->as.var_decl_stmt.struct_id = struct_id;
         vd->as.var_decl_stmt.name = tracey_token_strdup(&name_tok);
         tracey_parser_advance(parser);
         if (tracey_parser_check(parser, TRACEY_TOKEN_LBRACKET))
@@ -1364,9 +1845,36 @@ bool tracey_parser_parse(struct tracey_parser *parser, struct tracey_program *ou
     if (parser == NULL || out == NULL)
         return false;
     tracey_program_init(out);
+    parser->program = out;
 
     while (parser->has_current && parser->current.type != TRACEY_TOKEN_EOF)
     {
+        if (tracey_parser_check(parser, TRACEY_TOKEN_KEYWORD_TYPEDEF))
+        {
+            if (!tracey_parse_typedef(parser))
+            {
+                tracey_parser_synchronize(parser);
+                if (tracey_parser_check(parser, TRACEY_TOKEN_SEMICOLON))
+                    tracey_parser_advance(parser);
+            }
+            continue;
+        }
+        if (tracey_parser_check(parser, TRACEY_TOKEN_KEYWORD_STRUCT))
+        {
+            /*
+             * At file scope a struct tag can only introduce a definition;
+             * struct-typed global variables and struct return types are not
+             * supported yet, so the parser expects the brace-enclosed body
+             * directly and reports an error otherwise.
+             */
+            if (!tracey_parse_struct_definition(parser))
+            {
+                tracey_parser_synchronize(parser);
+                if (tracey_parser_check(parser, TRACEY_TOKEN_SEMICOLON))
+                    tracey_parser_advance(parser);
+            }
+            continue;
+        }
         if (parser->current.type == TRACEY_TOKEN_ERROR)
         {
             tracey_parser_error(parser, "Unexpected lexer error", &parser->current);
