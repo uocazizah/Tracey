@@ -1,0 +1,16 @@
+// case_47.trc: pointers, address-of, and dereference
+// expect_exit: 0
+// expect_stdout: 4242
+// A pointer stores the address of a variable; dereferencing reads the
+// value stored there, and writing through the pointer updates the original.
+
+int main()
+{
+    int x = 0;
+    int *p = &x;
+
+    *p = 42;
+    print(x);
+    print(*p);
+    return 0;
+}
