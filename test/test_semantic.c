@@ -133,9 +133,9 @@ TEST_CASE(semantic_struct_unknown_member_reported)
     CHECK_FALSE(semantic_ok("struct P { int x; }; int main() { struct P p; return p.z; }"));
 }
 
-TEST_CASE(semantic_struct_array_rejected)
+TEST_CASE(semantic_struct_array_valid)
 {
-    CHECK_FALSE(semantic_ok("struct P { int x; }; int main() { struct P a[3]; return 0; }"));
+    CHECK(semantic_ok("struct P { int x; }; int main() { struct P a[3]; a[0].x = 1; return a[0].x; }"));
 }
 
 TEST_CASE(semantic_struct_compound_assign_to_member_rejected)
@@ -163,7 +163,7 @@ TEST_MAIN_BEGIN("semantic")
     TEST_RUN(semantic_struct_member_read_write);
     TEST_RUN(semantic_struct_nested_member);
     TEST_RUN(semantic_struct_unknown_member_reported);
-    TEST_RUN(semantic_struct_array_rejected);
+    TEST_RUN(semantic_struct_array_valid);
     TEST_RUN(semantic_struct_compound_assign_to_member_rejected);
     TEST_RUN(semantic_member_access_on_non_struct_rejected);
 TEST_MAIN_END
