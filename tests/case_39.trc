@@ -1,0 +1,23 @@
+// case_39.trc: arrays of structs
+// expect_exit: 33
+// Fixed-size arrays of structs lay out each element at struct size, so
+// a[2].x does not alias a[0].x or a[1].x.
+
+struct Point
+{
+    int x;
+    int y;
+};
+
+int main()
+{
+    struct Point a[3];
+
+    a[0].x = 10;
+    a[0].y = 20;
+    a[1].x = 1;
+    a[1].y = 2;
+    a[2].x = a[0].x + a[1].x;
+    a[2].y = a[0].y + a[1].y;
+    return a[2].x + a[2].y;
+}
