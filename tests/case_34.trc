@@ -1,0 +1,19 @@
+// case_34.trc: struct member read/write
+// expect_exit: 7
+// A file-scope struct definition, a single struct local, and member reads
+// and writes. Every member occupies eight bytes in this stage, so the
+// result is the plain sum of the two stored members.
+
+struct Point
+{
+    int x;
+    int y;
+};
+
+int main()
+{
+    struct Point p;
+    p.x = 3;
+    p.y = 4;
+    return p.x + p.y;
+}
