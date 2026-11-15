@@ -946,8 +946,7 @@ static bool tracey_handle_else(const char *line, size_t line_len,
 
 static bool tracey_handle_elif(const char *line, size_t line_len,
                               struct tracey_if_stack *stack,
-                              struct tracey_macro_table *table,
-                              bool parent_active)
+                              struct tracey_macro_table *table)
 {
     size_t i = 0;
     bool condition = false;
@@ -1017,7 +1016,7 @@ static bool tracey_handle_elif(const char *line, size_t line_len,
                 condition = (val != 0);
             }
 
-            if (parent_active && condition)
+            if (top->parent_on && condition)
             {
                 top->active = true;
                 top->saw_true = true;
@@ -1131,8 +1130,7 @@ static bool tracey_handle_line(const char *line, size_t line_len, const char *ba
             return true;
         if (tracey_handle_else(line + i, line_len - i, if_stack))
             return true;
-        if (tracey_handle_elif(line + i, line_len - i, if_stack, table,
-                               active))
+        if (tracey_handle_elif(line + i, line_len - i, if_stack, table))
             return true;
         if (tracey_handle_endif(line + i, line_len - i, if_stack))
             return true;
