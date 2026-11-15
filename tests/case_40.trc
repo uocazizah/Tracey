@@ -1,0 +1,16 @@
+// case_40.trc: positional struct initializers
+// expect_exit: 7
+// A brace initializer stores its values at the corresponding member offsets.
+// Missing trailing members are left uninitialized, so only p is read here.
+
+struct Point
+{
+    int x;
+    int y;
+};
+
+int main()
+{
+    struct Point p = { 3, 4 };
+    return p.x + p.y;
+}
