@@ -30,9 +30,13 @@ regardless of the host the compiler runs on.
 - Floating-point values use the `s`/`d` registers and `fadd`, `fsub`,
   `fmul`, `fdiv`.
 - Pointers and arrays use `ldr`/`str` with byte or word strides.
-- Struct locals reserve `struct_def.size` bytes. Member access computes the
-  member address through `cg_gen_addr` and then loads or stores eight bytes,
-  because every member is eight-byte sized and aligned in this stage.
+- Struct locals reserve `struct_def.size` bytes (or `N * size` for an array).
+  Member access computes the member address through `cg_gen_addr`, honouring
+  the struct size as the array stride, and then loads or stores eight bytes.
+- Positional brace initializers evaluate each item and store it at the
+  corresponding member offset.
+- Function-pointer variables occupy eight bytes. A bare function name lowers
+  to its address (`adr`), and a call through a pointer uses `blr`.
 
 ## Output
 
