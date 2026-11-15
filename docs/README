@@ -23,15 +23,15 @@ Tracey is in the bootstrap stage. The compiler currently supports a broad
 subset of a C-like language: functions (including `void` and variadic
 declarations), local variables of many integer and floating-point types,
 basic `typedef` aliases, pointers and fixed-size arrays, file-scope `struct`
-definitions with local struct variables and member access, `if`/`else`,
-`while`, `do`/`while`, `for`, `switch`/`case`/`default`, `break`,
-`continue`, `goto` and labels, arithmetic, comparisons, logical and bitwise
-operators, ternary `?:`, prefix and postfix `++`/`--`, `sizeof`, assignment
-and compound assignment, and `return`. Some features keep deliberate
-bootstrap limits: `sizeof` returns 8 for every scalar type, `switch` cases
-do not fall through, `typedef` covers basic type aliases only, and struct
-support is limited to scalar and nested-struct members (no arrays,
-initializers, parameters, return values, or pointers). The internal
+definitions with local struct variables, member access, arrays of structs,
+and brace initializers, function pointers, `if`/`else`, `while`,
+`do`/`while`, `for`, `switch`/`case`/`default`, `break`, `continue`,
+`goto` and labels, arithmetic, comparisons, logical and bitwise operators,
+ternary `?:`, prefix and postfix `++`/`--`, `sizeof`, assignment and
+compound assignment, and `return`. Some features keep deliberate bootstrap
+limits: `sizeof` returns 8 for every scalar type, `switch` cases do not
+fall through, `typedef` covers basic type aliases only, and struct
+parameters, return values, and pointers are not supported. The internal
 assembler and linker support AArch64 Linux only.
 
 The compiler runs the full pipeline itself: it preprocesses, lexes,
