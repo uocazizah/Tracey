@@ -915,6 +915,126 @@ static bool tracey_handle_if(const char *line, size_t line_len,
     return true;
 }
 
+static bool tracey_handle_else(const char *line, size_t line_len,
+                            struct tracey_if_stack *stack)
+{
+    size_t i = 0;
+
+    while (i < line_len && tracey_is_space(line[i]))
+        i++;
+
+    if (line_len - i < 5 || memcmp(line + i, "#else", 5) != 0)
+        return false;
+
+    if (stack->count == 0)
+        return true;
+
+    {
+        struct tracey_if_entry *top = &stack->items[stack->count - 1];
+        if (!top->parent_on || top->saw_true)
+        {
+            top->active = false;
+        }
+        else
+        {
+            top->active = true;
+            top->saw_true = true;
+        }
+    }
+    return true;
+}
+
+static bool tracey_handle_elif(const char *line, size_t line_len,
+                              struct tracey_if_stack *stack,
+                              struct tracey_macro_table *table,
+                              bool parent_active)
+{
+    size_t i = 0;
+    bool condition = false;
+
+    while (i < line_len && tracey_is_space(line[i]))
+        i++;
+
+    if (line_len - i < 5 || memcmp(line + i, "#elif", 5) != 0)
+        return false;
+
+    if (stack->count == 0)
+        return true;
+
+    {
+        struct tracey_if_entry *top = &stack->items[stack->count - 1];
+        if (!top->saw_true)
+        {
+            i += 5;
+            while (i < line_len && tracey_is_space(line[i]))
+                i++;
+
+            if (strncmp(line + i, "defined", 7) == 0)
+            {
+                size_t j = i + 7;
+                while (j < line_len && tracey_is_space(line[j]))
+                    j++;
+                if (j < line_len && line[j] == '(')
+                {
+                    j++;
+                    while (j < line_len && tracey_is_space(line[j]))
+                        j++;
+                    size_t name_start = j;
+                    while (j < line_len && tracey_is_id_cont(line[j]))
+                        j++;
+                    char *name = tracey_strdup_range(line + name_start, j - name_start);
+                    if (j < line_len && line[j] == ')')
+                        j++;
+                    condition = tracey_eval_defined(name, table);
+                    free(name);
+                }
+                else
+                {
+                    size_t name_start = j;
+                    while (j < line_len && tracey_is_id_cont(line[j]))
+                        j++;
+                    char *name = tracey_strdup_range(line + name_start, j - name_start);
+                    condition = tracey_eval_defined(name, table);
+                    free(name);
+                }
+            }
+            else
+            {
+                long val = 0;
+                bool neg = false;
+                if (i < line_len && line[i] == '-')
+                {
+                    neg = true;
+                    i++;
+                }
+                while (i < line_len && line[i] >= '0' && line[i] <= '9')
+                {
+                    val = val * 10 + (line[i] - '0');
+                    i++;
+                }
+                if (neg)
+                    val = -val;
+                condition = (val != 0);
+            }
+
+            if (parent_active && condition)
+            {
+                top->active = true;
+                top->saw_true = true;
+            }
+            else
+            {
+                top->active = false;
+            }
+        }
+        else
+        {
+            top->active = false;
+        }
+    }
+    return true;
+}
+
 static bool tracey_handle_endif(const char *line, size_t line_len,
                                 struct tracey_if_stack *stack)
 {
@@ -1008,6 +1128,11 @@ static bool tracey_handle_line(const char *line, size_t line_len, const char *ba
             return true;
         if (tracey_handle_if(line + i, line_len - i, if_stack, table,
                              active))
+            return true;
+        if (tracey_handle_else(line + i, line_len - i, if_stack))
+            return true;
+        if (tracey_handle_elif(line + i, line_len - i, if_stack, table,
+                               active))
             return true;
         if (tracey_handle_endif(line + i, line_len - i, if_stack))
             return true;
