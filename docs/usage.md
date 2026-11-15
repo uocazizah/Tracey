@@ -52,16 +52,53 @@ Output:
 print(...);                 // variadic; ints/chars use print_int,
                             // char*/strings use print_str
 printf(fmt, ...);           // %d and %s in a literal format string
+puts(s);                    // write a char* followed by a newline
+putchar(c);                 // write one character
 ```
 
 Input (stdin only):
 
 ```trc
+int c = getchar();          // next byte; -1 at end of input
 int x = input_int();        // returns 0 on EOF or error
 char buf[32];
-input_str(buf, 32);        // reads a line, null-terminates, returns count
+input_str(buf, 32);         // reads a line, null-terminates, returns count
+fget(buf);                  // reads a line with no size limit
+fgets(buf, 32);             // reads a bounded line
+scanf("%d", &x);            // reads an integer
+scanfs("%s", buf, 32);      // reads a string into a bounded buffer
 print(buf);
 ```
+
+`scanf` reads a single value: a leading `%d` reads an integer and any other
+conversion is read as a string. `scanfs` is the bounded variant and takes
+the destination buffer size after the pointer. Neither handles more than the
+first conversion.
+
+## Structs
+
+```trc
+struct Point
+{
+    int x;
+    int y;
+};
+
+int main()
+{
+    struct Point p;
+    p.x = 3;
+    p.y = 4;
+    return p.x + p.y;
+}
+```
+
+A struct definition must appear at file scope, and its tag must be defined
+before use. Local struct variables support member read and write, including
+nested access through a struct-typed member (`o.in.a`). Struct arrays,
+initializers, parameters, return values, and pointers are not supported yet,
+and every member occupies eight bytes because there is no packing or
+alignment analysis.
 
 ## Manual toolchain
 
