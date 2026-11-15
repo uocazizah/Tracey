@@ -1,0 +1,35 @@
+// case_41.trc: function pointers
+// expect_exit: 19
+// A function name decays to a pointer, which can be stored, passed as an
+// argument, and called through with blr.
+
+int add(int a, int b)
+{
+    return a + b;
+}
+
+int mul(int a, int b)
+{
+    return a * b;
+}
+
+int apply(int (*op)(int, int), int x, int y)
+{
+    return op(x, y);
+}
+
+int main()
+{
+    int (*f)(int, int);
+    int r1;
+    int r2;
+
+    f = add;
+    r1 = f(3, 4);
+    f = mul;
+    r2 = f(3, 4);
+    print(r1);
+    print(r2);
+    print(apply(add, 3, 4));
+    return r1 + r2;
+}
