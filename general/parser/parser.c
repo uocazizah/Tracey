@@ -1556,22 +1556,100 @@ static struct tracey_stmt *tracey_parse_var_decl_as_stmt(struct tracey_parser *p
 {
     int struct_id = -1;
     enum tracey_type_kind t = tracey_parse_type_ex(parser, &struct_id);
+    struct tracey_func_sig *fn_sig = NULL;
     struct tracey_token name_tok;
     struct tracey_stmt *vd;
+    bool have_name = false;
 
-    if (!tracey_parser_check(parser, TRACEY_TOKEN_IDENTIFIER))
+    /* Function pointer declarator: 'type' '(' '*' name? ')' '(' params ')'. */
+    if (tracey_parser_check(parser, TRACEY_TOKEN_LPAREN))
     {
-        tracey_parser_error(parser, "Expected variable name", &parser->current);
-        return NULL;
+        struct tracey_token peek = tracey_lexer_peek(parser->lexer);
+
+
+        if (peek.type == TRACEY_TOKEN_STAR)
+        {
+            tracey_parser_advance(parser); /* '(' */
+            tracey_parser_advance(parser); /* '*' */
+            if (!tracey_parser_check(parser, TRACEY_TOKEN_IDENTIFIER))
+            {
+                tracey_parser_error(parser, "Expected function pointer name", &parser->current);
+                tracey_func_sig_free(fn_sig);
+                return NULL;
+            }
+            name_tok = parser->current;
+            have_name = true;
+            tracey_parser_advance(parser);
+            if (!tracey_parser_expect(parser, TRACEY_TOKEN_RPAREN, "expected ')'"))
+                return NULL;
+            if (!tracey_parser_expect(parser, TRACEY_TOKEN_LPAREN, "expected '('"))
+                return NULL;
+
+            fn_sig = (struct tracey_func_sig *)calloc(1, sizeof(*fn_sig));
+            if (fn_sig == NULL)
+                return NULL;
+            fn_sig->return_type = t;
+            if (!tracey_parser_check(parser, TRACEY_TOKEN_RPAREN))
+            {
+                for (;;)
+                {
+                    enum tracey_type_kind pt;
+                    int psid = -1;
+                    enum tracey_type_kind *np;
+
+                    if (tracey_parser_check(parser, TRACEY_TOKEN_DOT))
+                    {
+                        tracey_parser_match(parser, TRACEY_TOKEN_DOT);
+                        tracey_parser_match(parser, TRACEY_TOKEN_DOT);
+                        tracey_parser_match(parser, TRACEY_TOKEN_DOT);
+                        break;
+                    }
+                    pt = tracey_parse_type_ex(parser, &psid);
+                    if (tracey_parser_check(parser, TRACEY_TOKEN_IDENTIFIER))
+                        tracey_parser_advance(parser);
+                    np = (enum tracey_type_kind *)realloc(fn_sig->param_types,
+                                                           (fn_sig->param_count + 1) * sizeof(*np));
+                    if (np == NULL)
+                    {
+                        tracey_func_sig_free(fn_sig);
+                        return NULL;
+                    }
+                    fn_sig->param_types = np;
+                    fn_sig->param_types[fn_sig->param_count++] = pt;
+                    if (!tracey_parser_match(parser, TRACEY_TOKEN_COMMA))
+                        break;
+                }
+            }
+            if (!tracey_parser_expect(parser, TRACEY_TOKEN_RPAREN, "expected ')'"))
+            {
+                tracey_func_sig_free(fn_sig);
+                return NULL;
+            }
+            t = TRACEY_TYPE_FUNC_PTR;
+            struct_id = -1;
+        }
     }
-    name_tok = parser->current;
+
+    if (!have_name)
+    {
+        if (!tracey_parser_check(parser, TRACEY_TOKEN_IDENTIFIER))
+        {
+            if (fn_sig) tracey_func_sig_free(fn_sig);
+            tracey_parser_error(parser, "Expected variable name", &parser->current);
+            return NULL;
+        }
+        name_tok = parser->current;
+    }
+
     vd = tracey_stmt_create(TRACEY_STMT_VAR_DECL,
         (struct tracey_source_loc){name_tok.line, name_tok.column});
-    if (!vd) return NULL;
+    if (!vd) { tracey_func_sig_free(fn_sig); return NULL; }
     vd->as.var_decl_stmt.type = t;
     vd->as.var_decl_stmt.struct_id = struct_id;
+    vd->as.var_decl_stmt.fn_sig = fn_sig;
     vd->as.var_decl_stmt.name = tracey_token_strdup(&name_tok);
-    tracey_parser_advance(parser);
+    if (!have_name)
+        tracey_parser_advance(parser);
     if (tracey_parser_check(parser, TRACEY_TOKEN_LBRACKET))
     {
         tracey_parser_advance(parser);
@@ -1589,8 +1667,39 @@ static struct tracey_stmt *tracey_parse_var_decl_as_stmt(struct tracey_parser *p
     }
     if (tracey_parser_match(parser, TRACEY_TOKEN_ASSIGN))
     {
-        vd->as.var_decl_stmt.init = tracey_parse_expression(parser);
-        if (!vd->as.var_decl_stmt.init) { tracey_stmt_destroy(vd); return NULL; }
+        if (tracey_parser_check(parser, TRACEY_TOKEN_LBRACE))
+        {
+            struct tracey_expr *il = tracey_expr_create(TRACEY_EXPR_INIT_LIST,
+                (struct tracey_source_loc){parser->current.line, parser->current.column});
+            tracey_parser_advance(parser); /* '{' */
+            if (il == NULL) { tracey_stmt_destroy(vd); return NULL; }
+            if (!tracey_parser_check(parser, TRACEY_TOKEN_RBRACE))
+            {
+                for (;;)
+                {
+                    struct tracey_expr *it = tracey_parse_expression(parser);
+                    struct tracey_expr **ni;
+                    if (it == NULL) { tracey_expr_destroy(il); tracey_stmt_destroy(vd); return NULL; }
+                    ni = (struct tracey_expr **)realloc(il->as.init_list_expr.items,
+                                                       (il->as.init_list_expr.count + 1) * sizeof(*ni));
+                    if (ni == NULL) { tracey_expr_destroy(it); tracey_expr_destroy(il); tracey_stmt_destroy(vd); return NULL; }
+                    il->as.init_list_expr.items = ni;
+                    il->as.init_list_expr.items[il->as.init_list_expr.count++] = it;
+                    if (!tracey_parser_match(parser, TRACEY_TOKEN_COMMA))
+                        break;
+                    if (tracey_parser_check(parser, TRACEY_TOKEN_RBRACE))
+                        break;
+                }
+            }
+            if (!tracey_parser_expect(parser, TRACEY_TOKEN_RBRACE, "expected '}'"))
+            { tracey_expr_destroy(il); tracey_stmt_destroy(vd); return NULL; }
+            vd->as.var_decl_stmt.init = il;
+        }
+        else
+        {
+            vd->as.var_decl_stmt.init = tracey_parse_expression(parser);
+            if (!vd->as.var_decl_stmt.init) { tracey_stmt_destroy(vd); return NULL; }
+        }
     }
     return vd;
 }
@@ -1786,45 +1895,7 @@ static struct tracey_stmt *tracey_parse_statement(struct tracey_parser *parser)
         tracey_parser_check(parser, TRACEY_TOKEN_KEYWORD_STRUCT) ||
         tracey_parser_is_typedef_alias(parser))
     {
-        int struct_id = -1;
-        enum tracey_type_kind t = tracey_parse_type_ex(parser, &struct_id);
-        struct tracey_token name_tok;
-        struct tracey_stmt *vd;
-        if (!tracey_parser_check(parser, TRACEY_TOKEN_IDENTIFIER))
-        {
-            tracey_parser_error(parser, "Expected variable name", &parser->current);
-            return NULL;
-        }
-        name_tok = parser->current;
-        vd = tracey_stmt_create(TRACEY_STMT_VAR_DECL, (struct tracey_source_loc){name_tok.line, name_tok.column});
-        if (!vd) return NULL;
-        vd->as.var_decl_stmt.type = t;
-        vd->as.var_decl_stmt.struct_id = struct_id;
-        vd->as.var_decl_stmt.name = tracey_token_strdup(&name_tok);
-        tracey_parser_advance(parser);
-        if (tracey_parser_check(parser, TRACEY_TOKEN_LBRACKET))
-        {
-            tracey_parser_advance(parser);
-            if (tracey_parser_check(parser, TRACEY_TOKEN_INTEGER))
-            {
-                unsigned long long sv = 0;
-                struct tracey_token sztok = parser->current;
-                if (!tracey_parse_int_literal(&sztok, &sv))
-                    tracey_parser_error(parser, "Invalid array size", &sztok);
-                vd->as.var_decl_stmt.array_size = (size_t)sv;
-                tracey_parser_advance(parser);
-            }
-            if (!tracey_parser_expect(parser, TRACEY_TOKEN_RBRACKET, "expected ']'"))
-            { tracey_stmt_destroy(vd); return NULL; }
-        }
-        if (tracey_parser_match(parser, TRACEY_TOKEN_ASSIGN))
-        {
-            vd->as.var_decl_stmt.init = tracey_parse_expression(parser);
-            if (!vd->as.var_decl_stmt.init) { tracey_stmt_destroy(vd); return NULL; }
-        }
-        if (!tracey_parser_expect(parser, TRACEY_TOKEN_SEMICOLON, "expected ';'"))
-        { tracey_stmt_destroy(vd); return NULL; }
-        return vd;
+        return tracey_parse_var_decl_as_stmt(parser);
     }
     if (tracey_parser_check(parser, TRACEY_TOKEN_SEMICOLON))
     {
@@ -1880,26 +1951,99 @@ static bool tracey_parse_function(struct tracey_parser *parser, struct tracey_pr
                 break;
             }
             {
-                enum tracey_type_kind pt = tracey_parse_type(parser);
+                int psid = -1;
+                enum tracey_type_kind pt = tracey_parse_type_ex(parser, &psid);
+                struct tracey_func_sig *psig = NULL;
+                struct tracey_token pname_tok;
                 struct tracey_param *new_params;
-                if (pt == TRACEY_TYPE_VOID && !tracey_parser_check(parser, TRACEY_TOKEN_IDENTIFIER))
+
+                /* Function pointer parameter declarator. */
+                if (tracey_parser_check(parser, TRACEY_TOKEN_LPAREN))
+                {
+                    struct tracey_token pk = tracey_lexer_peek(parser->lexer);
+                    if (pk.type == TRACEY_TOKEN_STAR)
+                    {
+                        tracey_parser_advance(parser); /* '(' */
+                        tracey_parser_advance(parser); /* '*' */
+                        if (!tracey_parser_check(parser, TRACEY_TOKEN_IDENTIFIER))
+                        {
+                            tracey_parser_error(parser, "Expected parameter name", &parser->current);
+                            break;
+                        }
+                        pname_tok = parser->current;
+                        tracey_parser_advance(parser);
+                        if (!tracey_parser_expect(parser, TRACEY_TOKEN_RPAREN, "expected ')'"))
+                            break;
+                        if (!tracey_parser_expect(parser, TRACEY_TOKEN_LPAREN, "expected '('"))
+                            break;
+                        psig = (struct tracey_func_sig *)calloc(1, sizeof(*psig));
+                        if (psig == NULL) { tracey_function_decl_destroy(fn); return false; }
+                        psig->return_type = pt;
+                        if (!tracey_parser_check(parser, TRACEY_TOKEN_RPAREN))
+                        {
+                            for (;;)
+                            {
+                                enum tracey_type_kind ppt;
+                                int ppsid = -1;
+                                enum tracey_type_kind *np;
+                                if (tracey_parser_check(parser, TRACEY_TOKEN_DOT))
+                                {
+                                    tracey_parser_match(parser, TRACEY_TOKEN_DOT);
+                                    tracey_parser_match(parser, TRACEY_TOKEN_DOT);
+                                    tracey_parser_match(parser, TRACEY_TOKEN_DOT);
+                                    break;
+                                }
+                                ppt = tracey_parse_type_ex(parser, &ppsid);
+                                if (tracey_parser_check(parser, TRACEY_TOKEN_IDENTIFIER))
+                                    tracey_parser_advance(parser);
+                                np = (enum tracey_type_kind *)realloc(psig->param_types,
+                                                                       (psig->param_count + 1) * sizeof(*np));
+                                if (np == NULL)
+                                {
+                                    tracey_func_sig_free(psig);
+                                    tracey_function_decl_destroy(fn);
+                                    return false;
+                                }
+                                psig->param_types = np;
+                                psig->param_types[psig->param_count++] = ppt;
+                                if (!tracey_parser_match(parser, TRACEY_TOKEN_COMMA))
+                                    break;
+                            }
+                        }
+                        if (!tracey_parser_expect(parser, TRACEY_TOKEN_RPAREN, "expected ')'"))
+                        {
+                            tracey_func_sig_free(psig);
+                            break;
+                        }
+                        pt = TRACEY_TYPE_FUNC_PTR;
+                    }
+                }
+
+                if (pt == TRACEY_TYPE_VOID && !tracey_parser_check(parser, TRACEY_TOKEN_IDENTIFIER) &&
+                    psig == NULL)
                 {
                     if (fn->param_count > 0 || fn->variadic)
                         tracey_parser_error(parser, "Void parameter must be the only parameter", &parser->current);
                     break;
                 }
-                if (!tracey_parser_check(parser, TRACEY_TOKEN_IDENTIFIER))
+                if (psig == NULL)
                 {
-                    tracey_parser_error(parser, "Expected parameter name", &parser->current);
-                    break;
+                    if (!tracey_parser_check(parser, TRACEY_TOKEN_IDENTIFIER))
+                    {
+                        tracey_parser_error(parser, "Expected parameter name", &parser->current);
+                        break;
+                    }
+                    pname_tok = parser->current;
                 }
                 new_params = (struct tracey_param *)realloc(fn->params, (fn->param_count + 1) * sizeof(*new_params));
                 if (!new_params) { tracey_function_decl_destroy(fn); return false; }
                 fn->params = new_params;
                 fn->params[fn->param_count].type = pt;
-                fn->params[fn->param_count].name = tracey_token_strdup(&parser->current);
+                fn->params[fn->param_count].fn_sig = psig;
+                fn->params[fn->param_count].name = tracey_token_strdup(&pname_tok);
                 fn->param_count++;
-                tracey_parser_advance(parser);
+                if (psig == NULL)
+                    tracey_parser_advance(parser);
             }
             if (!tracey_parser_match(parser, TRACEY_TOKEN_COMMA))
                 break;
