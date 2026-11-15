@@ -28,6 +28,9 @@ struct tracey_semantic_symbol
      * tracey_semantic_analyze.
      */
     int struct_id;
+    /* Function pointer signature when type is TRACEY_TYPE_FUNC_PTR;
+     * otherwise NULL. Owned by this symbol. */
+    struct tracey_func_sig *fn_sig;
 };
 
 struct tracey_semantic_binding
