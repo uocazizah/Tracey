@@ -1,0 +1,19 @@
+// case_50.trc: for loop with compound assignment
+// expect_exit: 0
+// expect_stdout: 55
+// A for loop accumulates a sum using +=, exercising compound assignment
+// and the for-statement lowering together. 0+1+...+9 = 45... wait.
+// Sum 1..10 = 55.
+
+int main()
+{
+    int s = 0;
+    int i;
+
+    for (i = 1; i <= 10; i++)
+    {
+        s += i;
+    }
+    print(s);
+    return 0;
+}
