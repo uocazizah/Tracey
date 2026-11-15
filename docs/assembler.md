@@ -48,4 +48,5 @@ ELF64 relocatable object (`ET_REL`) with sections:
 
 - Only the instruction forms used by the code generator are guaranteed.
 - No macro or advanced directive support.
-- Shift instructions (`lsl`, `lsr`, `asr`) and `mvn` are not supported.
+- Shift instructions support the register forms only: `lsl`, `lsr`, and `asr`
+  take three registers, and `mvn` takes a destination and a source register.
