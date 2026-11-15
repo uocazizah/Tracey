@@ -267,6 +267,73 @@ static bool tracey_types_assignable(enum tracey_type_kind dst, enum tracey_type_
     return false;
 }
 
+/*
+ * tracey_semantic_expr_struct_id - resolve the struct id of an expression.
+ *
+ * Returns the index of the struct definition selected by the expression
+ * when it has struct value type, or -1 otherwise. Identifiers resolve
+ * through the current scope; member expressions resolve through their base.
+ * The function reports no diagnostics; callers decide how to report a
+ * missing struct.
+ */
+static int tracey_semantic_expr_struct_id(struct tracey_semantic_analyzer *sa,
+                                          const struct tracey_expr *e)
+{
+    if (e == NULL)
+        return -1;
+
+    if (e->kind == TRACEY_EXPR_IDENT)
+    {
+        struct tracey_semantic_symbol sym;
+
+        if (tracey_semantic_lookup(sa, e->as.ident_expr.name, &sym) &&
+            sym.type == TRACEY_TYPE_STRUCT)
+            return sym.struct_id;
+        return -1;
+    }
+
+    if (e->kind == TRACEY_EXPR_MEMBER)
+    {
+        int base_sid = tracey_semantic_expr_struct_id(sa, e->as.member_expr.base);
+        const struct tracey_struct_def *def;
+        size_t i;
+
+        if (base_sid < 0 || sa->program == NULL)
+            return -1;
+        def = &sa->program->structs[base_sid];
+        for (i = 0; i < def->member_count; i++)
+        {
+            if (def->members[i].name != NULL &&
+                strcmp(def->members[i].name, e->as.member_expr.field) == 0)
+                return def->members[i].struct_id;
+        }
+    }
+    return -1;
+}
+
+/*
+ * tracey_semantic_member - look up a member in the struct selected by base.
+ *
+ * base_sid must be a valid struct id. Returns a borrowed pointer to the
+ * member, or NULL when the struct has no such member.
+ */
+static const struct tracey_struct_member *
+tracey_semantic_member(struct tracey_semantic_analyzer *sa, int base_sid, const char *field)
+{
+    const struct tracey_struct_def *def;
+    size_t i;
+
+    if (sa->program == NULL || base_sid < 0 || (size_t)base_sid >= sa->program->struct_count)
+        return NULL;
+    def = &sa->program->structs[base_sid];
+    for (i = 0; i < def->member_count; i++)
+    {
+        if (def->members[i].name != NULL && strcmp(def->members[i].name, field) == 0)
+            return &def->members[i];
+    }
+    return NULL;
+}
+
 static enum tracey_type_kind tracey_semantic_check_expr(struct tracey_semantic_analyzer *sa,
                                                         struct tracey_expr *e,
                                                         const struct tracey_function_decl *fn)
@@ -319,6 +386,34 @@ static enum tracey_type_kind tracey_semantic_check_expr(struct tracey_semantic_a
             tracey_semantic_error(sa, "Subscript requires array or pointer", e->loc);
             return TRACEY_TYPE_INT;
         }
+        case TRACEY_EXPR_MEMBER:
+        {
+            struct tracey_expr *base = e->as.member_expr.base;
+            int base_sid;
+            const struct tracey_struct_member *m;
+
+            (void)tracey_semantic_check_expr(sa, base, fn);
+            base_sid = tracey_semantic_expr_struct_id(sa, base);
+            if (base_sid < 0)
+            {
+                tracey_semantic_error(sa, "Member access requires a struct value", e->loc);
+                return TRACEY_TYPE_INT;
+            }
+            m = tracey_semantic_member(sa, base_sid, e->as.member_expr.field);
+            if (m == NULL)
+            {
+                char buf[256];
+                const char *tag = (sa->program != NULL)
+                                      ? sa->program->structs[base_sid].name : "";
+
+                snprintf(buf, sizeof(buf), "Struct '%s' has no member named '%s'",
+                         tag ? tag : "",
+                         e->as.member_expr.field ? e->as.member_expr.field : "");
+                tracey_semantic_error(sa, buf, e->loc);
+                return TRACEY_TYPE_INT;
+            }
+            return m->type;
+        }
         case TRACEY_EXPR_ADDR:
         {
             enum tracey_type_kind t = tracey_semantic_check_expr(sa, e->as.addr_expr.operand, fn);
@@ -354,6 +449,20 @@ static enum tracey_type_kind tracey_semantic_check_expr(struct tracey_semantic_a
                 if (t != TRACEY_TYPE_BOOL)
                     tracey_semantic_error(sa, "'!' requires bool", e->loc);
                 return TRACEY_TYPE_BOOL;
+            }
+            if (e->as.unary_expr.op == TRACEY_UNARY_PRE_INC ||
+                e->as.unary_expr.op == TRACEY_UNARY_PRE_DEC ||
+                e->as.unary_expr.op == TRACEY_UNARY_POST_INC ||
+                e->as.unary_expr.op == TRACEY_UNARY_POST_DEC)
+            {
+                if (!tracey_is_integer(t))
+                    tracey_semantic_error(sa, "Increment/decrement requires integer", e->loc);
+                /* operand must be assignable */
+                if (!(e->as.unary_expr.operand->kind == TRACEY_EXPR_IDENT ||
+                      e->as.unary_expr.operand->kind == TRACEY_EXPR_INDEX ||
+                      e->as.unary_expr.operand->kind == TRACEY_EXPR_DEREF))
+                    tracey_semantic_error(sa, "Increment/decrement requires assignable lvalue", e->loc);
+                return t;
             }
             if (e->as.unary_expr.op == TRACEY_UNARY_BIT_NOT)
             {
@@ -421,6 +530,14 @@ static enum tracey_type_kind tracey_semantic_check_expr(struct tracey_semantic_a
                             tracey_semantic_error(sa, "Type mismatch in assignment", lhs->loc);
                     }
                     return elem;
+                }
+                if (lhs && lhs->kind == TRACEY_EXPR_MEMBER)
+                {
+                    enum tracey_type_kind lhs_t = tracey_semantic_check_expr(sa, lhs, fn);
+                    enum tracey_type_kind rt = tracey_semantic_check_expr(sa, e->as.binary_expr.right, fn);
+                    if (!tracey_types_assignable(lhs_t, rt))
+                        tracey_semantic_error(sa, "Type mismatch in assignment", e->loc);
+                    return lhs_t;
                 }
                 tracey_semantic_error(sa, "Invalid assignment target", e->loc);
                 (void)tracey_semantic_check_expr(sa, e->as.binary_expr.right, fn);
@@ -500,6 +617,15 @@ static enum tracey_type_kind tracey_semantic_check_expr(struct tracey_semantic_a
                                     tracey_semantic_error(sa, "Type mismatch in assignment", e->loc);
                             }
                             return elem;
+                        }
+                        if (lhs && lhs->kind == TRACEY_EXPR_MEMBER)
+                        {
+                            tracey_semantic_error(sa,
+                                "Compound assignment to a struct member is not supported yet",
+                                e->loc);
+                            (void)tracey_semantic_check_expr(sa, lhs, fn);
+                            (void)tracey_semantic_check_expr(sa, e->as.binary_expr.right, fn);
+                            return TRACEY_TYPE_INT;
                         }
                         tracey_semantic_error(sa, "Invalid assignment target", e->loc);
                         (void)tracey_semantic_check_expr(sa, e->as.binary_expr.right, fn);
@@ -617,6 +743,76 @@ static enum tracey_type_kind tracey_semantic_check_expr(struct tracey_semantic_a
                 }
                 return TRACEY_TYPE_INT;
             }
+            if (name && strcmp(name, "puts") == 0)
+            {
+                if (e->as.call_expr.arg_count != 1)
+                    tracey_semantic_error(sa, "Wrong number of arguments to 'puts'", e->loc);
+                if (e->as.call_expr.arg_count >= 1)
+                {
+                    enum tracey_type_kind t = tracey_semantic_check_expr(sa, e->as.call_expr.args[0], fn);
+                    if (t != TRACEY_TYPE_CHAR_PTR)
+                        tracey_semantic_error(sa, "puts requires char*", e->as.call_expr.args[0]->loc);
+                }
+                return TRACEY_TYPE_INT;
+            }
+            if (name && strcmp(name, "putchar") == 0)
+            {
+                if (e->as.call_expr.arg_count != 1)
+                    tracey_semantic_error(sa, "Wrong number of arguments to 'putchar'", e->loc);
+                if (e->as.call_expr.arg_count >= 1)
+                    tracey_semantic_check_expr(sa, e->as.call_expr.args[0], fn);
+                return TRACEY_TYPE_INT;
+            }
+            if (name && strcmp(name, "getchar") == 0)
+            {
+                if (e->as.call_expr.arg_count != 0)
+                    tracey_semantic_error(sa, "Wrong number of arguments to 'getchar'", e->loc);
+                return TRACEY_TYPE_INT;
+            }
+            if (name && strcmp(name, "fget") == 0)
+            {
+                if (e->as.call_expr.arg_count != 1)
+                    tracey_semantic_error(sa, "Wrong number of arguments to 'fget'", e->loc);
+                if (e->as.call_expr.arg_count >= 1)
+                {
+                    enum tracey_type_kind t = tracey_semantic_check_expr(sa, e->as.call_expr.args[0], fn);
+                    if (t != TRACEY_TYPE_CHAR_PTR)
+                        tracey_semantic_error(sa, "fget requires char* buffer", e->as.call_expr.args[0]->loc);
+                }
+                return TRACEY_TYPE_CHAR_PTR;
+            }
+            if (name && strcmp(name, "fgets") == 0)
+            {
+                if (e->as.call_expr.arg_count != 2)
+                    tracey_semantic_error(sa, "Wrong number of arguments to 'fgets'", e->loc);
+                if (e->as.call_expr.arg_count >= 1)
+                {
+                    enum tracey_type_kind t = tracey_semantic_check_expr(sa, e->as.call_expr.args[0], fn);
+                    if (t != TRACEY_TYPE_CHAR_PTR)
+                        tracey_semantic_error(sa, "fgets requires char* buffer", e->as.call_expr.args[0]->loc);
+                }
+                if (e->as.call_expr.arg_count >= 2)
+                {
+                    enum tracey_type_kind t = tracey_semantic_check_expr(sa, e->as.call_expr.args[1], fn);
+                    if (t != TRACEY_TYPE_INT)
+                        tracey_semantic_error(sa, "fgets size must be int", e->as.call_expr.args[1]->loc);
+                }
+                return TRACEY_TYPE_CHAR_PTR;
+            }
+            if (name && (strcmp(name, "scanf") == 0 || strcmp(name, "scanfs") == 0))
+            {
+                if (e->as.call_expr.arg_count < 2)
+                    tracey_semantic_error(sa, "Wrong number of arguments", e->loc);
+                if (e->as.call_expr.arg_count >= 1)
+                {
+                    enum tracey_type_kind t = tracey_semantic_check_expr(sa, e->as.call_expr.args[0], fn);
+                    if (t != TRACEY_TYPE_CHAR_PTR)
+                        tracey_semantic_error(sa, "Format must be char*", e->as.call_expr.args[0]->loc);
+                }
+                for (size_t ai = 1; ai < e->as.call_expr.arg_count; ai++)
+                    tracey_semantic_check_expr(sa, e->as.call_expr.args[ai], fn);
+                return TRACEY_TYPE_INT;
+            }
             if (name && strcmp(name, "printf") == 0)
             {
                 for (i = 0; i < e->as.call_expr.arg_count; i++)
@@ -704,6 +900,17 @@ static void tracey_semantic_check_stmt(struct tracey_semantic_analyzer *sa, stru
             sym.type = vt;
             sym.is_function = false;
             sym.arity = 0;
+            sym.struct_id = s->as.var_decl_stmt.struct_id;
+            if (vt == TRACEY_TYPE_STRUCT && s->as.var_decl_stmt.array_size > 0)
+            {
+                tracey_semantic_error(sa, "Arrays of structs are not supported yet", s->loc);
+                return;
+            }
+            if (vt == TRACEY_TYPE_STRUCT && s->as.var_decl_stmt.init != NULL)
+            {
+                tracey_semantic_error(sa, "Struct initialization is not supported yet", s->loc);
+                return;
+            }
             if (!tracey_semantic_declare(sa, s->as.var_decl_stmt.name, sym, s->loc))
                 return;
             if (s->as.var_decl_stmt.init)
@@ -725,6 +932,40 @@ static void tracey_semantic_check_stmt(struct tracey_semantic_analyzer *sa, stru
             tracey_semantic_check_stmt(sa, s->as.if_stmt.then_branch, fn, expected_return);
             if (s->as.if_stmt.else_branch)
                 tracey_semantic_check_stmt(sa, s->as.if_stmt.else_branch, fn, expected_return);
+            return;
+        }
+        case TRACEY_STMT_DO_WHILE:
+        {
+            sa->loop_depth++;
+            tracey_semantic_check_stmt(sa, s->as.do_while_stmt.body, fn, expected_return);
+            {
+                enum tracey_type_kind t = tracey_semantic_check_expr(sa, s->as.do_while_stmt.condition, fn);
+                if (t != TRACEY_TYPE_BOOL)
+                    tracey_semantic_error(sa, "Do-while condition must be bool", s->loc);
+            }
+            sa->loop_depth--;
+            return;
+        }
+        case TRACEY_STMT_SWITCH:
+        {
+            enum tracey_type_kind t = tracey_semantic_check_expr(sa, s->as.switch_stmt.condition, fn);
+            if (!tracey_is_integer(t))
+                tracey_semantic_error(sa, "Switch condition must be integer", s->loc);
+            sa->switch_depth++;
+            for (size_t ci = 0; ci < s->as.switch_stmt.case_count; ci++)
+            {
+                /* uniqueness check */
+                for (size_t cj = ci + 1; cj < s->as.switch_stmt.case_count; cj++)
+                {
+                    if (s->as.switch_stmt.cases[ci].value == s->as.switch_stmt.cases[cj].value)
+                        tracey_semantic_error(sa, "Duplicate case value", s->loc);
+                }
+                if (s->as.switch_stmt.cases[ci].body)
+                    tracey_semantic_check_stmt(sa, s->as.switch_stmt.cases[ci].body, fn, expected_return);
+            }
+            if (s->as.switch_stmt.default_body)
+                tracey_semantic_check_stmt(sa, s->as.switch_stmt.default_body, fn, expected_return);
+            sa->switch_depth--;
             return;
         }
         case TRACEY_STMT_WHILE:
@@ -768,9 +1009,12 @@ static void tracey_semantic_check_stmt(struct tracey_semantic_analyzer *sa, stru
             return;
         }
         case TRACEY_STMT_BREAK:
+            if (sa->loop_depth <= 0 && sa->switch_depth <= 0)
+                tracey_semantic_error(sa, "'break' must be inside a loop or switch", s->loc);
+            return;
         case TRACEY_STMT_CONTINUE:
             if (sa->loop_depth <= 0)
-                tracey_semantic_error(sa, "'break'/'continue' must be inside a loop", s->loc);
+                tracey_semantic_error(sa, "'continue' must be inside a loop", s->loc);
             return;
         case TRACEY_STMT_GOTO:
         {
@@ -846,6 +1090,7 @@ static void tracey_semantic_check_function(struct tracey_semantic_analyzer *sa,
         sym.type = fn->params[i].type;
         sym.is_function = false;
         sym.arity = 0;
+        sym.struct_id = -1;
         tracey_semantic_declare(sa, fn->params[i].name, sym, fn->loc);
     }
     if (fn->body)
@@ -912,6 +1157,7 @@ bool tracey_semantic_analyze(struct tracey_semantic_analyzer *sa, struct tracey_
         return false;
     tracey_semantic_free(sa);
     tracey_semantic_init(sa);
+    sa->program = program;
     tracey_semantic_push_scope(sa);
 
     for (i = 0; i < program->function_count; i++)
@@ -921,6 +1167,7 @@ bool tracey_semantic_analyze(struct tracey_semantic_analyzer *sa, struct tracey_
         sym.type = fn->return_type;
         sym.is_function = true;
         sym.arity = (int)fn->param_count;
+        sym.struct_id = -1;
         tracey_semantic_declare(sa, fn->name, sym, fn->loc);
     }
     for (i = 0; i < program->function_count; i++)
