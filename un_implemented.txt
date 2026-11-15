@@ -7,21 +7,14 @@ against include/tracey/*.h and general/{lexer,parser,semantic,codegen,preprocess
 
 1. Lexer
 -------
-- Hexadecimal / binary integer *values*: the lexer recognises 0x/0X and
-  0b/0B prefixes, but the parser decodes decimal only, so these literals
-  are not usable yet.
 - Integer suffixes (u, l, ul, ll) are not implemented.
 - Character literals wider than one byte / multi-char constants.
-- Bitwise complement for non-integer types (~ applies to integer operands
-  only; mvn encoding is missing from the assembler, temporarily returns 0).
 - Compound assignment for bitwise ops is lexed/parsed but codegen uses
   load-modify-store for all compound assignments.
 
 2. Parser / Grammar
 ------------------
 - Question-mark / colon ternary is implemented and right-associative.
-- Shift operators (<<, >>) are lexed but have no parser precedence level
-  and are not usable in expressions yet.
 - Any statement or expression forms not listed in the implemented grammar:
   no try/catch, no foreach/range-for.
 
@@ -91,11 +84,8 @@ against include/tracey/*.h and general/{lexer,parser,semantic,codegen,preprocess
 - No optimization passes (no dead-code elimination, no constant folding
   at codegen time, no register allocation beyond stack temporaries).
 - Calls with more than 8 arguments are not supported (x0..x7 only).
-- Assembler missing encodings:
-    * lsl (logical shift left) — not supported.
-    * lsr / asr (logical / arithmetic shift right) — not supported.
-    * mvn (bitwise not move) — bitwise NOT currently emits mov x0,#0.
-  eor (exclusive OR) IS implemented (0xCA000000 base).
+- Shift instructions are emitted and assembled in register form only; there
+  is no immediate-shift form (`lsl x0, x0, #n`).
 - No stack canaries, no ASLR/Pie considerations, no unwind tables
   (.cfi_*) emitted.
 - No support for tail calls.
