@@ -116,6 +116,38 @@ TEST_CASE(semantic_input_str_type_mismatch)
     CHECK_FALSE(semantic_ok("int main() { int x; input_str(x, 16); return 0; }"));
 }
 
+TEST_CASE(semantic_struct_member_read_write)
+{
+    CHECK(semantic_ok("struct P { int x; int y; }; "
+                      "int main() { struct P p; p.x = 1; p.y = 2; return p.x + p.y; }"));
+}
+
+TEST_CASE(semantic_struct_nested_member)
+{
+    CHECK(semantic_ok("struct Inner { int a; }; struct Outer { struct Inner in; }; "
+                      "int main() { struct Outer o; o.in.a = 5; return o.in.a; }"));
+}
+
+TEST_CASE(semantic_struct_unknown_member_reported)
+{
+    CHECK_FALSE(semantic_ok("struct P { int x; }; int main() { struct P p; return p.z; }"));
+}
+
+TEST_CASE(semantic_struct_array_rejected)
+{
+    CHECK_FALSE(semantic_ok("struct P { int x; }; int main() { struct P a[3]; return 0; }"));
+}
+
+TEST_CASE(semantic_struct_compound_assign_to_member_rejected)
+{
+    CHECK_FALSE(semantic_ok("struct P { int x; }; int main() { struct P p; p.x += 1; return p.x; }"));
+}
+
+TEST_CASE(semantic_member_access_on_non_struct_rejected)
+{
+    CHECK_FALSE(semantic_ok("int main() { int x = 1; return x.field; }"));
+}
+
 TEST_MAIN_BEGIN("semantic")
     TEST_RUN(semantic_valid_program);
     TEST_RUN(semantic_undefined_variable);
@@ -128,4 +160,10 @@ TEST_MAIN_BEGIN("semantic")
     TEST_RUN(semantic_input_str_valid);
     TEST_RUN(semantic_input_str_wrong_arity);
     TEST_RUN(semantic_input_str_type_mismatch);
+    TEST_RUN(semantic_struct_member_read_write);
+    TEST_RUN(semantic_struct_nested_member);
+    TEST_RUN(semantic_struct_unknown_member_reported);
+    TEST_RUN(semantic_struct_array_rejected);
+    TEST_RUN(semantic_struct_compound_assign_to_member_rejected);
+    TEST_RUN(semantic_member_access_on_non_struct_rejected);
 TEST_MAIN_END
