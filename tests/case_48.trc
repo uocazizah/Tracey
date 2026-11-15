@@ -1,0 +1,13 @@
+// case_48.trc: typedef alias
+// expect_exit: 0
+// expect_stdout: 100
+// A file-scope typedef alias can be used in later variable declarations.
+
+typedef int Integer;
+
+int main()
+{
+    Integer x = 100;
+    print(x);
+    return 0;
+}
