@@ -1,0 +1,26 @@
+// case_35.trc: nested struct member access
+// expect_exit: 57
+// An outer struct with a struct-typed member. The inner member's offset is
+// the outer member size (eight bytes), so o.in.a must not alias o.tag.
+
+struct Inner
+{
+    int a;
+    int b;
+};
+
+struct Outer
+{
+    int tag;
+    struct Inner in;
+};
+
+int main()
+{
+    struct Outer o;
+
+    o.tag = 7;
+    o.in.a = 42;
+    o.in.b = 8;
+    return o.tag + o.in.a + o.in.b;
+}
