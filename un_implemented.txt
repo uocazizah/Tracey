@@ -12,7 +12,6 @@ against include/tracey/*.h and general/{lexer,parser,semantic,codegen,preprocess
   are not usable yet.
 - Integer suffixes (u, l, ul, ll) are not implemented.
 - Character literals wider than one byte / multi-char constants.
-- Increment / decrement operators (++ and --).
 - Bitwise complement for non-integer types (~ applies to integer operands
   only; mvn encoding is missing from the assembler, temporarily returns 0).
 - Compound assignment for bitwise ops is lexed/parsed but codegen uses
@@ -24,12 +23,22 @@ against include/tracey/*.h and general/{lexer,parser,semantic,codegen,preprocess
 - Shift operators (<<, >>) are lexed but have no parser precedence level
   and are not usable in expressions yet.
 - Any statement or expression forms not listed in the implemented grammar:
-  no do-while, no switch, no try/catch, no foreach/range-for.
+  no try/catch, no foreach/range-for.
 
 3. Types
 -------
-- No struct / union / enum types.
-- No typedef / type aliases.
+- Struct support covers file-scope definitions with scalar and nested-struct
+  members and local struct variables with member read/write only. Struct
+  arrays, initializers, parameters, return values, pointers to structs, and
+  compound assignment to members are not supported.
+- Struct layout has no packing or alignment analysis: every member occupies
+  a multiple of eight bytes, so `sizeof`-based reasoning about padding does
+  not apply.
+- No union / enum types.
+- typedef is limited to basic type aliases (for example `typedef int
+  Integer;`) recorded at file scope; struct, union, enum, and
+  function-pointer aliases are not supported.
+- No function pointer types.
 - No function pointer types.
 - No variable-length arrays; only fixed-size arrays that decay to pointers.
 - long vs long long: both 64-bit on AArch64 LP64 but distinct types;
@@ -37,8 +46,9 @@ against include/tracey/*.h and general/{lexer,parser,semantic,codegen,preprocess
 
 4. Statements
 ------------
-- No switch statement.
-- No do-while loop.
+- switch has no fall-through: each case body is independent and only
+  integer literal case labels are accepted. break is supported to exit the
+  switch.
 - goto: forward-only restriction is NOT statically enforced; labels are
   validated as declared/used per function, but direction (forward vs
   backward) is not checked.
@@ -49,8 +59,8 @@ against include/tracey/*.h and general/{lexer,parser,semantic,codegen,preprocess
 -------------
 - No compound literals, no designated initializers.
 - No typeof / decltype.
-- No sizeof operator as an expression (size_t is a type keyword but
-  sizeof is not implemented).
+- sizeof is implemented but always yields 8 for every scalar type; it does
+  not compute the real size of the operand.
 
 6. Semantic / Type Checking
 --------------------------
@@ -62,8 +72,9 @@ against include/tracey/*.h and general/{lexer,parser,semantic,codegen,preprocess
 
 7. Preprocessor
 --------------
-- #if expression support is minimal: defined(NAME) or integer constants
-  only; macro names are not expanded, and there is no #else/#elif.
+- #if / #elif expression support is minimal: defined(NAME) or integer
+  constants only; macro names are not expanded. #else and #elif are
+  supported, but conditions may not use general macro expressions.
 - #ifndef GCC / #defined cross-compiler macro semantics are partially
   implemented (#defined NAME defines NAME=1 only if a host builtin such
   as __GNUC__ is present) but need full host-compiler integration.
@@ -96,6 +107,8 @@ against include/tracey/*.h and general/{lexer,parser,semantic,codegen,preprocess
 - No incremental / dependency-based rebuild beyond #include visited-set
   guarding.
 
-Note: The standard library (lib/stdio.htrc, lib/stdio.trc) provides only
-the builtins print, printf, input_int, input_str and is documented
-separately; it is out of scope for this core-language list.
+Note: The standard library (lib/stdio.htrc, lib/stdio.trc) provides the
+builtins print, printf, puts, putchar, getchar, fget, fgets, scanf, scanfs,
+input_int, and input_str, and is documented separately; it is out of scope
+for this core-language list. scanf/scanfs honour only the first %d or %s
+conversion.
