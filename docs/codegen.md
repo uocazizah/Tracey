@@ -24,6 +24,8 @@ regardless of the host the compiler runs on.
   it runs, so there is no fall-through.
 - Prefix and postfix `++`/`--` load the operand, adjust it, store it back,
   and leave the new value (prefix) or the old value (postfix) in `x0`.
+- Shifts are lowered to `lsl` (left) and `lsr` (right) with the amount in a
+  register. Bitwise NOT is lowered to `mvn`.
 - `return` branches to a function epilogue label.
 - Floating-point values use the `s`/`d` registers and `fadd`, `fsub`,
   `fmul`, `fdiv`.
@@ -49,8 +51,5 @@ compiler emits `.loc` line directives for basic debug information.
 - `switch` cases do not fall through; each case body branches to the end of
   the switch.
 - `scanf`/`scanfs` honour only the first `%d` or `%s` conversion.
-- Shift operators (`<<`, `>>`) are parsed but code generation passes the
-  left operand through unchanged.
-- Bitwise NOT (`~`) is parsed but currently generates `mov x0, #0`.
 - `-g`, `-Werror`, `-O`, and `-D` are accepted on the command line but are
   not yet acted on by the compiler.
