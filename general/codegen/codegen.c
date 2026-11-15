@@ -883,6 +883,10 @@ static void cg_gen_expr(struct tracey_codegen_ctx *ctx, const struct tracey_expr
                 cg_emit(ctx, "cmp x0, #0");
                 cg_emit(ctx, "cset x0, eq");
             }
+            else if (e->as.unary_expr.op == TRACEY_UNARY_BIT_NOT)
+            {
+                cg_emit(ctx, "mvn x0, x0");
+            }
             else if (e->as.unary_expr.op == TRACEY_UNARY_PRE_INC ||
                      e->as.unary_expr.op == TRACEY_UNARY_PRE_DEC ||
                      e->as.unary_expr.op == TRACEY_UNARY_POST_INC ||
@@ -1392,9 +1396,10 @@ static void cg_gen_expr(struct tracey_codegen_ctx *ctx, const struct tracey_expr
                     cg_emit(ctx, "eor x0, x0, x1");
                     break;
                 case TRACEY_BINARY_SHIFT_LEFT:
+                    cg_emit(ctx, "lsl x0, x0, x1");
+                    break;
                 case TRACEY_BINARY_SHIFT_RIGHT:
-                    /* Shift instructions not yet supported by the assembler;
-                     * pass through the left operand. */
+                    cg_emit(ctx, "lsr x0, x0, x1");
                     break;
                 default:
                     break;
