@@ -24,10 +24,15 @@ What works today
   be used in later variable declarations. Union, enum, and function-pointer
   aliases are not supported yet.
 - File-scope `struct` definitions whose members are scalars or other structs,
-  and local struct variables with member read and write (`p.x`, `o.in.a`).
-  Struct arrays, initializers, parameters, return values, and pointers are
-  not supported yet, and every member occupies eight bytes because there is
-  no packing or alignment analysis yet.
+  and local struct variables with member read and write (`p.x`, `o.in.a`),
+  fixed-size arrays of structs (`a[i].x`), and positional brace
+  initializers (`struct Point p = { 3, 4 };`). Struct parameters, return
+  values, and pointers are not supported yet, and every member occupies
+  eight bytes because there is no packing or alignment analysis yet.
+- Function pointers declared with the `int (*f)(int, int)` declarator,
+  assignment of a function name, and calls through a pointer (`f(1, 2)`).
+  Function-pointer parameters are supported; return values and typedefs of
+  function pointers are not.
 - Fixed-size arrays that decay to pointers.
 - Statements: `if`/`else`, `while`, `do`/`while`, `for`,
   `switch`/`case`/`default`, `break`, `continue`, `goto`, labels, `return`,
