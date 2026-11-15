@@ -33,10 +33,11 @@ What works today
   `switch`/`case`/`default`, `break`, `continue`, `goto`, labels, `return`,
   blocks, and expression statements. `switch` cases do not fall through to
   the next case.
-- Expressions: arithmetic, comparisons, logical, bitwise, ternary `?:`,
-  prefix and postfix `++`/`--`, assignment and compound assignment, indexing,
-  address-of, dereference, and `sizeof` (which currently yields 8 for every
-  scalar type).
+- Expressions: arithmetic, comparisons, logical, bitwise, shift (`<<`,
+  `>>`), ternary `?:`, prefix and postfix `++`/`--`, assignment and compound
+  assignment, indexing, address-of, dereference, and `sizeof` (which
+  currently yields 8 for every scalar type). Integer literals may be written
+  in decimal, hexadecimal (`0x`), or binary (`0b`).
 - A small standard library: `print`, `printf`, `puts`, `putchar`, `getchar`,
   `fget`, `fgets`, `scanf`, `scanfs`, `input_int`, `input_str`.
 - A C-like preprocessor: `#include`, `#define`, `#ifdef`, `#ifndef`,
