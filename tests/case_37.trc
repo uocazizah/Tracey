@@ -1,0 +1,12 @@
+// case_37.trc: shift operators and precedence
+// expect_exit: 48
+// Shifts bind looser than addition and tighter than comparison, as in C.
+// 1 << 4 is 16 and 256 >> 3 is 32; both are usable in larger expressions.
+
+int main()
+{
+    int a = 1 << 4;
+    int b = 256 >> 3;
+    int c = 1 + 2 << 3;   /* (1 + 2) << 3 = 24 */
+    return a + b + (c - c);
+}
