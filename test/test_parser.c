@@ -85,6 +85,21 @@ TEST_CASE(parser_unknown_struct_tag_reported)
     CHECK_FALSE(parse_source("int main() { struct Nope p; return 0; }"));
 }
 
+TEST_CASE(parser_shift_expressions)
+{
+    CHECK(parse_source("int main() { int x = 1 << 4; int y = 256 >> 3; return x + y; }"));
+}
+
+TEST_CASE(parser_hex_and_binary_literals)
+{
+    CHECK(parse_source("int main() { int x = 0xFF; int y = 0b1011; int a[0x4]; return x + y; }"));
+}
+
+TEST_CASE(parser_bitwise_not)
+{
+    CHECK(parse_source("int main() { return ~0 & 255; }"));
+}
+
 TEST_MAIN_BEGIN("parser")
     TEST_RUN(parser_empty_program);
     TEST_RUN(parser_simple_function);
@@ -94,4 +109,7 @@ TEST_MAIN_BEGIN("parser")
     TEST_RUN(parser_struct_definition_and_member_access);
     TEST_RUN(parser_struct_nested_member_access);
     TEST_RUN(parser_unknown_struct_tag_reported);
+    TEST_RUN(parser_shift_expressions);
+    TEST_RUN(parser_hex_and_binary_literals);
+    TEST_RUN(parser_bitwise_not);
 TEST_MAIN_END
