@@ -43,6 +43,13 @@ enum tracey_type_kind
     TRACEY_TYPE_DOUBLE,
     TRACEY_TYPE_FLOAT_PTR,
     TRACEY_TYPE_DOUBLE_PTR,
+    /*
+     * Aggregate value type. This kind carries no layout by itself: the
+     * struct_id recorded alongside the type selects the matching entry in
+     * tracey_program::structs. A struct type is only meaningful while the
+     * program that declares it is alive.
+     */
+    TRACEY_TYPE_STRUCT,
 };
 
 enum tracey_unary_op
@@ -50,6 +57,10 @@ enum tracey_unary_op
     TRACEY_UNARY_NEG = 0,
     TRACEY_UNARY_LOG_NOT,
     TRACEY_UNARY_BIT_NOT,
+    TRACEY_UNARY_PRE_INC,
+    TRACEY_UNARY_PRE_DEC,
+    TRACEY_UNARY_POST_INC,
+    TRACEY_UNARY_POST_DEC,
 };
 
 enum tracey_binary_op
@@ -100,6 +111,7 @@ enum tracey_expr_kind
     TRACEY_EXPR_DEREF,
     TRACEY_EXPR_CALL,
     TRACEY_EXPR_TERNARY,
+    TRACEY_EXPR_MEMBER,
 };
 
 enum tracey_stmt_kind
@@ -109,6 +121,8 @@ enum tracey_stmt_kind
     TRACEY_STMT_EXPR,
     TRACEY_STMT_IF,
     TRACEY_STMT_WHILE,
+    TRACEY_STMT_SWITCH,
+    TRACEY_STMT_DO_WHILE,
     TRACEY_STMT_FOR,
     TRACEY_STMT_BREAK,
     TRACEY_STMT_CONTINUE,
@@ -195,6 +209,20 @@ struct tracey_ternary_expr
 };
 
 /*
+ * Member access (base.field).
+ *
+ * base is the aggregate expression whose member is selected. field is the
+ * member name exactly as written; the parser does not resolve it. The
+ * semantic analyzer and the code generator each look the name up in the
+ * struct definition selected by the base expression's struct id.
+ */
+struct tracey_member_expr
+{
+    struct tracey_expr *base;
+    char *field;
+};
+
+/*
  * Expression node.
  *
  * kind selects the active member of the union. The node owns any heap
@@ -220,6 +248,7 @@ struct tracey_expr
         struct tracey_deref_expr deref_expr;
         struct tracey_call_expr call_expr;
         struct tracey_ternary_expr ternary_expr;
+        struct tracey_member_expr member_expr;
     } as;
 };
 
@@ -232,6 +261,11 @@ struct tracey_block_stmt
 struct tracey_var_decl_stmt
 {
     enum tracey_type_kind type;
+    /*
+     * Selects the struct definition when type is TRACEY_TYPE_STRUCT;
+     * otherwise it is -1. The id indexes tracey_program::structs.
+     */
+    int struct_id;
     char *name;
     size_t array_size;
     struct tracey_expr *init;
@@ -253,6 +287,28 @@ struct tracey_while_stmt
 {
     struct tracey_expr *condition;
     struct tracey_stmt *body;
+};
+
+struct tracey_switch_case
+{
+    long value;
+    bool has_value; /* false for default */
+    struct tracey_stmt *body;
+};
+
+struct tracey_switch_stmt
+{
+    struct tracey_expr *condition;
+    struct tracey_switch_case *cases;
+    size_t case_count;
+    size_t case_cap;
+    struct tracey_stmt *default_body;
+};
+
+struct tracey_do_while_stmt
+{
+    struct tracey_stmt *body;
+    struct tracey_expr *condition;
 };
 
 struct tracey_for_stmt
@@ -296,6 +352,8 @@ struct tracey_stmt
         struct tracey_expr_stmt expr_stmt;
         struct tracey_if_stmt if_stmt;
         struct tracey_while_stmt while_stmt;
+        struct tracey_switch_stmt switch_stmt;
+        struct tracey_do_while_stmt do_while_stmt;
         struct tracey_for_stmt for_stmt;
         struct tracey_goto_stmt goto_stmt;
         struct tracey_label_stmt label_stmt;
@@ -320,10 +378,47 @@ struct tracey_function_decl
     struct tracey_source_loc loc;
 };
 
+/*
+ * Struct member layout.
+ *
+ * Only scalar members are accepted in the current stage: every member
+ * occupies eight bytes so the code generator can address it with a single
+ * 64-bit load or store. There is no packing or alignment analysis yet, so
+ * struct_id is always -1 here and offset is simply eight times the member
+ * index.
+ */
+struct tracey_struct_member
+{
+    enum tracey_type_kind type;
+    int struct_id;
+    char *name;
+    size_t offset;
+};
+
+/*
+ * Struct definition.
+ *
+ * name is the tag used after the struct keyword. members is a growable
+ * array owned by the definition. size is the total storage in bytes; it is
+ * recomputed as members are appended. Definitions are owned by the
+ * tracey_program that declares them and are released by tracey_program_free.
+ */
+struct tracey_struct_def
+{
+    char *name;
+    struct tracey_struct_member *members;
+    size_t member_count;
+    size_t member_cap;
+    size_t size;
+};
+
 struct tracey_program
 {
     struct tracey_function_decl **functions;
     size_t function_count;
+    struct tracey_struct_def *structs;
+    size_t struct_count;
+    size_t struct_cap;
 };
 
 /* Allocation and destruction helpers. */
@@ -335,6 +430,44 @@ void tracey_program_free(struct tracey_program *program);
 void tracey_expr_destroy(struct tracey_expr *expr);
 void tracey_stmt_destroy(struct tracey_stmt *stmt);
 void tracey_function_decl_destroy(struct tracey_function_decl *fn);
+
+/*
+ * tracey_program_add_struct - declare a struct tag and return its id.
+ *
+ * The tag name is copied. Declaring the same tag twice creates a second,
+ * independent definition; the parser resolves tags by first match. Returns
+ * the new definition's index, or -1 on allocation failure.
+ */
+int tracey_program_add_struct(struct tracey_program *program, const char *name);
+
+/*
+ * tracey_program_find_struct - look up a struct tag by name.
+ *
+ * Returns a borrowed pointer to the definition, or NULL when the tag is
+ * unknown. The pointer is invalidated by any later add_struct call that
+ * causes the definitions array to grow.
+ */
+struct tracey_struct_def *tracey_program_find_struct(const struct tracey_program *program,
+                                                     const char *name);
+
+/*
+ * tracey_program_find_struct_id - resolve a struct tag to its index.
+ *
+ * Returns the definition index, or -1 when the tag is unknown.
+ */
+int tracey_program_find_struct_id(const struct tracey_program *program, const char *name);
+
+/*
+ * tracey_struct_add_member - append a member to a struct definition.
+ *
+ * The member name is copied. offset is set to the current size of the
+ * definition and the definition's size grows by size, rounded up to a
+ * multiple of eight so that later members stay 64-bit aligned. size must
+ * be greater than zero. Returns false on allocation failure, when size is
+ * zero, or when a member with the same name already exists.
+ */
+bool tracey_struct_add_member(struct tracey_struct_def *def, const char *name,
+                              enum tracey_type_kind type, int struct_id, size_t size);
 
 #ifdef __cplusplus
 }
