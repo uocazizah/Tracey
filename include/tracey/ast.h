@@ -50,6 +50,11 @@ enum tracey_type_kind
      * program that declares it is alive.
      */
     TRACEY_TYPE_STRUCT,
+    /*
+     * Function pointer type. The pointee signature is stored separately in a
+     * tracey_func_sig because it cannot be encoded in the flat enum.
+     */
+    TRACEY_TYPE_FUNC_PTR,
 };
 
 enum tracey_unary_op
@@ -112,6 +117,7 @@ enum tracey_expr_kind
     TRACEY_EXPR_CALL,
     TRACEY_EXPR_TERNARY,
     TRACEY_EXPR_MEMBER,
+    TRACEY_EXPR_INIT_LIST,
 };
 
 enum tracey_stmt_kind
@@ -222,6 +228,13 @@ struct tracey_member_expr
     char *field;
 };
 
+struct tracey_init_list_expr
+{
+    struct tracey_expr **items;
+    size_t count;
+    size_t cap;
+};
+
 /*
  * Expression node.
  *
@@ -249,6 +262,7 @@ struct tracey_expr
         struct tracey_call_expr call_expr;
         struct tracey_ternary_expr ternary_expr;
         struct tracey_member_expr member_expr;
+        struct tracey_init_list_expr init_list_expr;
     } as;
 };
 
@@ -256,6 +270,14 @@ struct tracey_block_stmt
 {
     struct tracey_stmt **statements;
     size_t count;
+};
+
+struct tracey_func_sig
+{
+    enum tracey_type_kind return_type;
+    enum tracey_type_kind *param_types;
+    size_t param_count;
+    size_t param_cap;
 };
 
 struct tracey_var_decl_stmt
@@ -266,6 +288,11 @@ struct tracey_var_decl_stmt
      * otherwise it is -1. The id indexes tracey_program::structs.
      */
     int struct_id;
+    /*
+     * Function pointer signature when type is TRACEY_TYPE_FUNC_PTR;
+     * otherwise NULL. Owned by this declaration.
+     */
+    struct tracey_func_sig *fn_sig;
     char *name;
     size_t array_size;
     struct tracey_expr *init;
@@ -364,6 +391,11 @@ struct tracey_stmt
 struct tracey_param
 {
     enum tracey_type_kind type;
+    /*
+     * Function pointer signature when type is TRACEY_TYPE_FUNC_PTR;
+     * otherwise NULL. Owned by this parameter.
+     */
+    struct tracey_func_sig *fn_sig;
     char *name;
 };
 
@@ -430,6 +462,7 @@ void tracey_program_free(struct tracey_program *program);
 void tracey_expr_destroy(struct tracey_expr *expr);
 void tracey_stmt_destroy(struct tracey_stmt *stmt);
 void tracey_function_decl_destroy(struct tracey_function_decl *fn);
+void tracey_func_sig_free(struct tracey_func_sig *sig);
 
 /*
  * tracey_program_add_struct - declare a struct tag and return its id.
