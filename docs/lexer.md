@@ -68,9 +68,9 @@ token). A letter or underscore immediately after the digits is an error
 can show it — `123abc` and `0x10` are reported, never silently split into
 two tokens.
 
-Note: the parser currently decodes decimal integer literals only. Hexadecimal
-and binary prefixes are accepted by the lexer but are not yet converted
-correctly, so avoid them in source for now.
+Note: the parser decodes decimal, hexadecimal (`0x`/`0X`), and binary
+(`0b`/`0B`) integer literals. The prefix stays part of the lexeme the parser
+receives, and the decoder selects the base from that prefix.
 
 ### Floating point
 
@@ -125,10 +125,8 @@ bitwise operator, not an error.
 
 ### Not yet implemented
 
-Hex/binary integer value conversion in the parser, char literals wider than
-one byte, and bitwise shift code generation (the operators are lexed but the
-parser does not give them a precedence level, so they cannot be used in
-expressions).
+Character literals wider than one byte, integer suffixes (`u`, `l`, `ul`,
+`ll`), and hexadecimal floating-point literals.
 
 ## Errors and recovery
 
