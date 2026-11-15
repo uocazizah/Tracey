@@ -21,9 +21,13 @@ against include/tracey/*.h and general/{lexer,parser,semantic,codegen,preprocess
 3. Types
 -------
 - Struct support covers file-scope definitions with scalar and nested-struct
-  members and local struct variables with member read/write only. Struct
-  arrays, initializers, parameters, return values, pointers to structs, and
-  compound assignment to members are not supported.
+  members, local struct variables with member read/write, fixed-size arrays
+  of structs, and positional brace initializers. Struct parameters, return
+  values, pointers to structs, and compound assignment to members are not
+  supported.
+- Function pointers are supported for local variables and parameters, calls
+  through a pointer, and function-name decay. Function-pointer return values
+  and typedefs of function pointers are not supported.
 - Struct layout has no packing or alignment analysis: every member occupies
   a multiple of eight bytes, so `sizeof`-based reasoning about padding does
   not apply.
@@ -31,8 +35,9 @@ against include/tracey/*.h and general/{lexer,parser,semantic,codegen,preprocess
 - typedef is limited to basic type aliases (for example `typedef int
   Integer;`) recorded at file scope; struct, union, enum, and
   function-pointer aliases are not supported.
-- No function pointer types.
-- No function pointer types.
+- Function pointer types are supported for local variables and parameters
+  (see above); function-pointer return values and typedefs of function
+  pointers are not.
 - No variable-length arrays; only fixed-size arrays that decay to pointers.
 - long vs long long: both 64-bit on AArch64 LP64 but distinct types;
   implicit conversion allowed but not formally specified.
