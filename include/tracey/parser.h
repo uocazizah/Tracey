@@ -27,6 +27,19 @@ struct tracey_parser
     size_t error_cap;
     struct tracey_token current;
     bool has_current;
+
+    /*
+     * Program under construction. Set for the duration of
+     * tracey_parser_parse so that struct tags can be looked up and
+     * registered while parsing. May be NULL when the parser is used
+     * standalone (for example in unit tests).
+     */
+    struct tracey_program *program;
+
+    char **typedef_names;
+    enum tracey_type_kind *typedef_types;
+    size_t typedef_count;
+    size_t typedef_cap;
 };
 
 /*
