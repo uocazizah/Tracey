@@ -186,6 +186,14 @@ void tracey_expr_destroy(struct tracey_expr *expr)
             tracey_expr_destroy(expr->as.member_expr.base);
             free(expr->as.member_expr.field);
             break;
+        case TRACEY_EXPR_INIT_LIST:
+        {
+            size_t i;
+            for (i = 0; i < expr->as.init_list_expr.count; i++)
+                tracey_expr_destroy(expr->as.init_list_expr.items[i]);
+            free(expr->as.init_list_expr.items);
+            break;
+        }
         default:
             break;
     }
@@ -210,6 +218,7 @@ void tracey_stmt_destroy(struct tracey_stmt *stmt)
         case TRACEY_STMT_VAR_DECL:
             free(stmt->as.var_decl_stmt.name);
             tracey_expr_destroy(stmt->as.var_decl_stmt.init);
+            tracey_func_sig_free(stmt->as.var_decl_stmt.fn_sig);
             break;
         case TRACEY_STMT_EXPR:
             tracey_expr_destroy(stmt->as.expr_stmt.expression);
@@ -272,10 +281,21 @@ void tracey_function_decl_destroy(struct tracey_function_decl *fn)
 
     free(fn->name);
     for (i = 0; i < fn->param_count; i++)
+    {
         free(fn->params[i].name);
+        tracey_func_sig_free(fn->params[i].fn_sig);
+    }
     free(fn->params);
     tracey_stmt_destroy(fn->body);
     free(fn);
+}
+
+void tracey_func_sig_free(struct tracey_func_sig *sig)
+{
+    if (sig == NULL)
+        return;
+    free(sig->param_types);
+    free(sig);
 }
 
 void tracey_program_free(struct tracey_program *program)
