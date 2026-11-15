@@ -1,0 +1,18 @@
+// case_43.trc: prefix and postfix increment and decrement
+// expect_exit: 0
+// expect_stdout: 1133
+// Prefix forms update before use; postfix forms update after use. The final
+// value of x is 0, which is the process exit code.
+
+int main()
+{
+    int x = 0;
+
+    print(++x);   // 1
+    print(x++);   // 1
+    print(++x);   // 3
+    print(x--);   // 3
+    --x;          // x becomes 1
+    x = x - 1;    // x becomes 0
+    return x;
+}
