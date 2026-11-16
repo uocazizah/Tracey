@@ -1,8 +1,8 @@
 // case_44.trc: sizeof operator
 // expect_exit: 0
-// expect_stdout: 88
-// sizeof currently yields the fixed value 8 for every scalar type in this
-// bootstrap, so sizeof(int) and sizeof(double) both report 8.
+// expect_stdout: 48
+// sizeof now yields the real size of its operand type: int is 4 bytes and
+// double is 8 bytes.
 
 int main()
 {

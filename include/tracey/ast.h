@@ -50,6 +50,7 @@ enum tracey_type_kind
      * program that declares it is alive.
      */
     TRACEY_TYPE_STRUCT,
+    TRACEY_TYPE_STRUCT_PTR,
     /*
      * Function pointer type. The pointee signature is stored separately in a
      * tracey_func_sig because it cannot be encoded in the flat enum.
@@ -118,6 +119,7 @@ enum tracey_expr_kind
     TRACEY_EXPR_TERNARY,
     TRACEY_EXPR_MEMBER,
     TRACEY_EXPR_INIT_LIST,
+    TRACEY_EXPR_SIZEOF,
 };
 
 enum tracey_stmt_kind
@@ -236,6 +238,22 @@ struct tracey_init_list_expr
 };
 
 /*
+ * sizeof expression.
+ *
+ * When is_type is true, the size refers to the type described by type,
+ * struct_id, and fn_sig. Otherwise it refers to the type of operand, which
+ * is owned by this node.
+ */
+struct tracey_sizeof_expr
+{
+    bool is_type;
+    enum tracey_type_kind type;
+    int struct_id;
+    struct tracey_func_sig *fn_sig;
+    struct tracey_expr *operand;
+};
+
+/*
  * Expression node.
  *
  * kind selects the active member of the union. The node owns any heap
@@ -263,6 +281,7 @@ struct tracey_expr
         struct tracey_ternary_expr ternary_expr;
         struct tracey_member_expr member_expr;
         struct tracey_init_list_expr init_list_expr;
+        struct tracey_sizeof_expr sizeof_expr;
     } as;
 };
 
@@ -392,6 +411,11 @@ struct tracey_param
 {
     enum tracey_type_kind type;
     /*
+     * Index of the struct definition when type is TRACEY_TYPE_STRUCT or
+     * TRACEY_TYPE_STRUCT_PTR; -1 otherwise.
+     */
+    int struct_id;
+    /*
      * Function pointer signature when type is TRACEY_TYPE_FUNC_PTR;
      * otherwise NULL. Owned by this parameter.
      */
@@ -402,6 +426,12 @@ struct tracey_param
 struct tracey_function_decl
 {
     enum tracey_type_kind return_type;
+    int return_struct_id;
+    /*
+     * Function pointer signature when return_type is TRACEY_TYPE_FUNC_PTR;
+     * otherwise NULL. Owned by this declaration.
+     */
+    struct tracey_func_sig *return_fn_sig;
     char *name;
     struct tracey_param *params;
     size_t param_count;
@@ -442,6 +472,7 @@ struct tracey_struct_def
     size_t member_count;
     size_t member_cap;
     size_t size;
+    size_t alignment;
 };
 
 struct tracey_program
@@ -500,7 +531,8 @@ int tracey_program_find_struct_id(const struct tracey_program *program, const ch
  * zero, or when a member with the same name already exists.
  */
 bool tracey_struct_add_member(struct tracey_struct_def *def, const char *name,
-                              enum tracey_type_kind type, int struct_id, size_t size);
+                              enum tracey_type_kind type, int struct_id,
+                              size_t size, size_t alignment);
 
 #ifdef __cplusplus
 }

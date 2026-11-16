@@ -1,0 +1,15 @@
+// case_51.trc: sizeof real scalar and pointer sizes
+// expect_exit: 0
+// expect_stdout: 1248488
+
+int main()
+{
+    print(sizeof(char));
+    print(sizeof(short));
+    print(sizeof(int));
+    print(sizeof(long));
+    print(sizeof(float));
+    print(sizeof(double));
+    print(sizeof(int*));
+    return 0;
+}

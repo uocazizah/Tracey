@@ -64,9 +64,11 @@ struct tracey_semantic_analyzer
      */
     struct tracey_program *program;
     char **goto_labels;
+    size_t *goto_label_lines;
     size_t goto_label_count;
     size_t goto_label_cap;
     char **declared_labels;
+    size_t *declared_label_lines;
     size_t declared_label_count;
     size_t declared_label_cap;
 };

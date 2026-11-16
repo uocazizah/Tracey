@@ -1,0 +1,14 @@
+// case_52.trc: immediate shift form and register fallback
+// expect_exit: 162
+// Constant shift amounts use lsl/lsr #n; non-constant amounts
+// fall back to the register form.
+
+int main()
+{
+    int x = 10;
+    int s = 3;
+    int a = x << 3;
+    int b = x >> 2;
+    int c = x << s;
+    return a + b + c;
+}

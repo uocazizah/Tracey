@@ -8,15 +8,20 @@ LEXER_SRCS        := general/lexer/lexer.c
 ARGUMENT_SRCS     := general/argument/argument.c general/argument/argument_parse.c \
                      general/argument/argument_help.c general/argument/argument_debug.c
 AST_SRCS          := general/ast/ast.c
-PARSER_SRCS       := general/parser/parser.c
-SEMANTIC_SRCS     := general/semantic/semantic.c
-CODEGEN_SRCS      := general/codegen/codegen.c
+PARSER_SRCS       := general/parser/parser.c general/parser/parser_types.c \
+                     general/parser/parser_expr.c general/parser/parser_stmt.c \
+                     general/parser/parser_decl.c
+SEMANTIC_SRCS     := general/semantic/semantic.c general/semantic/semantic_helpers.c \
+                     general/semantic/semantic_expr.c general/semantic/semantic_stmt.c
+CODEGEN_SRCS      := general/codegen/codegen.c general/codegen/codegen_helpers.c \
+                     general/codegen/codegen_expr.c general/codegen/codegen_stmt.c
 DIAGNOSTICS_SRCS  := general/diagnostics/diagnostics.c
 PREPROCESSOR_SRCS := general/preprocessor/preprocessor.c
 PIPELINE_SRCS     := general/pipeline/pipeline.c
 RUNTIME_SRCS      := general/runtime/runtime.c
 ELF_SRCS          := general/elf/elf.c
-ASSEMBLER_SRCS    := general/assembler/assembler.c
+ASSEMBLER_SRCS    := general/assembler/assembler.c general/assembler/assembler_helpers.c \
+                     general/assembler/assembler_encode.c
 LINKER_SRCS       := general/linker/linker.c
 
 ALL_MODULE_SRCS := $(COMMON_SRCS) $(SOURCE_SRCS) $(LEXER_SRCS) $(ARGUMENT_SRCS) \

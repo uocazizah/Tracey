@@ -1,0 +1,92 @@
+Tracey Compiler - Remaining Implementation Plan (reference for other agents)
+=========================================================================
+
+This file records the phases not yet implemented after the completed work
+(phases 1-5 and 9). See /home/aufa/.opencode/plan/tracey-core-codegen-completion.md
+for the full plan. Current state: build green, 51/51 tests pass.
+
+Phase 6: Calls with more than 8 arguments
+-----------------------------------------
+Goal: support calls with >8 args using AArch64 stack-argument ABI.
+
+Tasks:
+- general/codegen/codegen.c general call lowering: evaluate args into slots,
+  load first 8 into x0..x7, place extra args (arg8..) on the stack in
+  ascending order at call time, then restore sp.
+- Ensure alignment (16-byte) and correct cleanup on all paths.
+- Semantic/parser already accept arbitrary arg counts; verify no hidden cap.
+- Add e2e test with a 10+ argument function.
+
+Files: general/codegen/codegen.c
+Risks: stack layout mistakes; register/stack mismatch between caller/callee.
+
+Phase 7: Shift immediate form
+-----------------------------
+Goal: emit `lsl/lsr/asr #n` when shift amount is compile-time constant.
+
+Tasks:
+- general/assembler/assembler.c: add encoding for immediate shifts (UBFM/SBFM
+  or dedicated immediate forms) for both register widths.
+- general/codegen/codegen.c: detect constant shift amount in shift expressions
+  and emit immediate form; fall back to register form otherwise.
+- Add e2e tests using `x << 3`, `x >> 2`.
+
+Files: general/assembler/assembler.c, general/codegen/codegen.c
+
+Phase 8: break/continue stack cleanup on error paths
+----------------------------------------------------
+Goal: on semantic/codegen error inside a loop, pop stale break/continue
+targets so later codegen is not corrupted.
+
+Tasks:
+- general/codegen/codegen.c: in error-handling paths within loop/switch
+  lowering, restore break/continue stack depth to saved checkpoint.
+- Document invariant: stack depth restored on all paths.
+- Add tests triggering errors inside loops.
+
+Files: general/codegen/codegen.c
+
+Phase 10: Implicit narrowing diagnostics
+---------------------------------------
+Goal: warn on float->int and long->int conversions in assignments.
+
+Tasks:
+- general/semantic/semantic.c: in assignment/initializer checking, detect
+  narrowing conversions and emit a diagnostic.
+- Decide severity: warning by default (to avoid breaking existing tests).
+- Update un_implemented.txt.
+
+Files: general/semantic/semantic.c
+
+Phase 11: Integer suffixes in lexer
+-----------------------------------
+Goal: lex `u`, `l`, `ul`, `ll` suffixes and record resulting type.
+
+Tasks:
+- general/lexer/lexer.c: parse suffix after integer literal.
+- general/semantic/semantic.c: incorporate suffix into literal type.
+- Token/type plumbing may be needed so suffix affects AST type.
+
+Files: general/lexer/lexer.c, general/semantic/semantic.c, include/tracey/ast.h (if needed)
+
+Phase 12: Preprocessor completion
+----------------------------------
+Goal: close preprocessor gaps.
+
+Tasks:
+- general/preprocessor/preprocessor.c: #undef, #error, #warning.
+- Multi-parameter macro substitution (all params, not just first).
+- Variadic macros (... / __VA_ARGS__).
+- Token pasting (##) and stringification (#).
+- Macro expansion in #if/#elif.
+
+Files: general/preprocessor/preprocessor.c, include/tracey/preprocessor.h
+
+General notes for agents
+------------------------
+- Keep `make` and `make test` green at each phase boundary.
+- Add new e2e cases under tests/case_52+ and update unit tests when behavior changes.
+- Update un_implemented.txt and docs as features land; never document
+  unimplemented behavior as existing.
+- Follow AGENTS.md commenting style (no @param/@return tags).
+- Memory ownership and ABI decisions must be documented in code.

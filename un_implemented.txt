@@ -88,9 +88,9 @@ against include/tracey/*.h and general/{lexer,parser,semantic,codegen,preprocess
 - Target is AArch64 only; no x86_64, RISC-V, or other backends.
 - No optimization passes (no dead-code elimination, no constant folding
   at codegen time, no register allocation beyond stack temporaries).
-- Calls with more than 8 arguments are not supported (x0..x7 only).
-- Shift instructions are emitted and assembled in register form only; there
-  is no immediate-shift form (`lsl x0, x0, #n`).
+- Calls with more than 8 arguments are supported via the AArch64 stack-argument ABI (x0..x7 plus stack slots).
+- Shift instructions use the immediate form (`lsl/lsr/asr #n`) when the shift
+  amount is a compile-time constant, and the register form otherwise.
 - No stack canaries, no ASLR/Pie considerations, no unwind tables
   (.cfi_*) emitted.
 - No support for tail calls.

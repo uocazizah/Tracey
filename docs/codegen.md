@@ -47,7 +47,8 @@ compiler emits `.loc` line directives for basic debug information.
 
 - Only AArch64 is implemented.
 - No optimization is performed.
-- Calls with more than 8 arguments are not supported.
+- Calls with more than 8 arguments are supported via the AArch64
+  stack-argument ABI (arguments beyond x7 are passed on the stack).
 - `sizeof` is resolved by the parser to the fixed value 8 for every scalar
   type; the emitted code does not depend on the operand type.
 - Struct member access loads and stores eight bytes per member regardless of

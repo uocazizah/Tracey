@@ -64,6 +64,7 @@ int tracey_program_add_struct(struct tracey_program *program, const char *name)
     def->member_count = 0;
     def->member_cap = 0;
     def->size = 0;
+    def->alignment = 1;
     return (int)program->struct_count++;
 }
 
@@ -97,12 +98,12 @@ int tracey_program_find_struct_id(const struct tracey_program *program, const ch
 }
 
 bool tracey_struct_add_member(struct tracey_struct_def *def, const char *name,
-                              enum tracey_type_kind type, int struct_id, size_t size)
+                              enum tracey_type_kind type, int struct_id,
+                               size_t size, size_t alignment)
 {
     size_t i;
-    size_t padded;
 
-    if (def == NULL || name == NULL || size == 0)
+    if (def == NULL || name == NULL || size == 0 || alignment == 0)
         return false;
     for (i = 0; i < def->member_count; i++)
     {
@@ -124,12 +125,20 @@ bool tracey_struct_add_member(struct tracey_struct_def *def, const char *name,
     def->members[def->member_count].name = strdup(name);
     if (def->members[def->member_count].name == NULL)
         return false;
-    def->members[def->member_count].offset = def->size;
-    def->member_count++;
-    padded = size;
-    if (padded % 8 != 0)
-        padded += 8 - (padded % 8);
-    def->size += padded;
+    {
+        size_t offset = def->size;
+        if (offset % alignment != 0)
+            offset += alignment - (offset % alignment);
+        def->members[def->member_count].offset = offset;
+        def->member_count++;
+        if (alignment > def->alignment)
+            def->alignment = alignment;
+        if (def->alignment == 0)
+            def->alignment = 1;
+        def->size = offset + size;
+        if (def->size % def->alignment != 0)
+            def->size += def->alignment - (def->size % def->alignment);
+    }
     return true;
 }
 
@@ -194,6 +203,10 @@ void tracey_expr_destroy(struct tracey_expr *expr)
             free(expr->as.init_list_expr.items);
             break;
         }
+        case TRACEY_EXPR_SIZEOF:
+            tracey_expr_destroy(expr->as.sizeof_expr.operand);
+            tracey_func_sig_free(expr->as.sizeof_expr.fn_sig);
+            break;
         default:
             break;
     }
@@ -280,6 +293,7 @@ void tracey_function_decl_destroy(struct tracey_function_decl *fn)
         return;
 
     free(fn->name);
+    tracey_func_sig_free(fn->return_fn_sig);
     for (i = 0; i < fn->param_count; i++)
     {
         free(fn->params[i].name);

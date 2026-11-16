@@ -38,6 +38,7 @@ struct tracey_parser
 
     char **typedef_names;
     enum tracey_type_kind *typedef_types;
+    struct tracey_func_sig **typedef_fn_sigs;
     size_t typedef_count;
     size_t typedef_cap;
 };
