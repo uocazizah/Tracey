@@ -12,7 +12,12 @@ enum tracey_type_kind tracey_semantic_check_expr(struct tracey_semantic_analyzer
     switch (e->kind)
     {
         case TRACEY_EXPR_INT:
-            return TRACEY_TYPE_INT;
+        {
+            enum tracey_type_kind t = e->as.int_expr.type;
+            if (t == TRACEY_TYPE_VOID)
+                t = TRACEY_TYPE_INT;
+            return t;
+        }
         case TRACEY_EXPR_BOOL:
             return TRACEY_TYPE_BOOL;
         case TRACEY_EXPR_REAL:
@@ -210,8 +215,11 @@ enum tracey_type_kind tracey_semantic_check_expr(struct tracey_semantic_analyzer
                         }
                         {
                             enum tracey_type_kind rt = tracey_semantic_check_expr(sa, rhs, fn);
-                            if (rt != sym.type)
+                            if (!tracey_types_assignable(sym.type, rt) &&
+                                !tracey_semantic_is_narrowing_conversion(sym.type, rt))
                                 tracey_semantic_error(sa, "Type mismatch in assignment", e->loc);
+                            else if (tracey_semantic_is_narrowing_conversion(sym.type, rt))
+                                tracey_semantic_warning(sa, "Narrowing conversion in assignment", e->loc);
                             return sym.type;
                         }
                     }
@@ -230,8 +238,10 @@ enum tracey_type_kind tracey_semantic_check_expr(struct tracey_semantic_analyzer
                         tracey_semantic_error(sa, "Subscript requires array or pointer", lhs->loc);
                     {
                         enum tracey_type_kind rt = tracey_semantic_check_expr(sa, e->as.binary_expr.right, fn);
-                        if (rt != elem)
+                        if (rt != elem && !tracey_semantic_is_narrowing_conversion(elem, rt))
                             tracey_semantic_error(sa, "Type mismatch in assignment", e->loc);
+                        else if (tracey_semantic_is_narrowing_conversion(elem, rt))
+                            tracey_semantic_warning(sa, "Narrowing conversion in assignment", e->loc);
                     }
                     return elem;
                 }
@@ -246,8 +256,10 @@ enum tracey_type_kind tracey_semantic_check_expr(struct tracey_semantic_analyzer
                         tracey_semantic_error(sa, "Cannot dereference non-pointer", lhs->loc);
                     {
                         enum tracey_type_kind rt = tracey_semantic_check_expr(sa, e->as.binary_expr.right, fn);
-                        if (rt != elem)
+                        if (rt != elem && !tracey_semantic_is_narrowing_conversion(elem, rt))
                             tracey_semantic_error(sa, "Type mismatch in assignment", lhs->loc);
+                        else if (tracey_semantic_is_narrowing_conversion(elem, rt))
+                            tracey_semantic_warning(sa, "Narrowing conversion in assignment", lhs->loc);
                     }
                     return elem;
                 }
@@ -255,8 +267,11 @@ enum tracey_type_kind tracey_semantic_check_expr(struct tracey_semantic_analyzer
                 {
                     enum tracey_type_kind lhs_t = tracey_semantic_check_expr(sa, lhs, fn);
                     enum tracey_type_kind rt = tracey_semantic_check_expr(sa, e->as.binary_expr.right, fn);
-                    if (!tracey_types_assignable(lhs_t, rt))
+                    if (!tracey_types_assignable(lhs_t, rt) &&
+                        !tracey_semantic_is_narrowing_conversion(lhs_t, rt))
                         tracey_semantic_error(sa, "Type mismatch in assignment", e->loc);
+                    else if (tracey_semantic_is_narrowing_conversion(lhs_t, rt))
+                        tracey_semantic_warning(sa, "Narrowing conversion in assignment", e->loc);
                     return lhs_t;
                 }
                 tracey_semantic_error(sa, "Invalid assignment target", e->loc);
@@ -294,8 +309,11 @@ enum tracey_type_kind tracey_semantic_check_expr(struct tracey_semantic_analyzer
                             }
                             {
                                 enum tracey_type_kind rt2 = tracey_semantic_check_expr(sa, e->as.binary_expr.right, fn);
-                                if (!tracey_types_assignable(sym.type, rt2))
+                                if (!tracey_types_assignable(sym.type, rt2) &&
+                                    !tracey_semantic_is_narrowing_conversion(sym.type, rt2))
                                     tracey_semantic_error(sa, "Type mismatch in assignment", e->loc);
+                                else if (tracey_semantic_is_narrowing_conversion(sym.type, rt2))
+                                    tracey_semantic_warning(sa, "Narrowing conversion in assignment", e->loc);
                                 return sym.type;
                             }
                         }
@@ -320,8 +338,11 @@ enum tracey_type_kind tracey_semantic_check_expr(struct tracey_semantic_analyzer
                                 tracey_semantic_error(sa, "Subscript requires array or pointer", lhs->loc);
                             {
                                 enum tracey_type_kind rt2 = tracey_semantic_check_expr(sa, e->as.binary_expr.right, fn);
-                                if (!tracey_types_assignable(elem, rt2))
+                                if (!tracey_types_assignable(elem, rt2) &&
+                                    !tracey_semantic_is_narrowing_conversion(elem, rt2))
                                     tracey_semantic_error(sa, "Type mismatch in assignment", e->loc);
+                                else if (tracey_semantic_is_narrowing_conversion(elem, rt2))
+                                    tracey_semantic_warning(sa, "Narrowing conversion in assignment", e->loc);
                             }
                             return elem;
                         }
@@ -333,8 +354,11 @@ enum tracey_type_kind tracey_semantic_check_expr(struct tracey_semantic_analyzer
                                 tracey_semantic_error(sa, "Cannot dereference non-pointer", lhs->loc);
                             {
                                 enum tracey_type_kind rt2 = tracey_semantic_check_expr(sa, e->as.binary_expr.right, fn);
-                                if (!tracey_types_assignable(elem, rt2))
+                                if (!tracey_types_assignable(elem, rt2) &&
+                                    !tracey_semantic_is_narrowing_conversion(elem, rt2))
                                     tracey_semantic_error(sa, "Type mismatch in assignment", e->loc);
+                                else if (tracey_semantic_is_narrowing_conversion(elem, rt2))
+                                    tracey_semantic_warning(sa, "Narrowing conversion in assignment", e->loc);
                             }
                             return elem;
                         }
@@ -342,8 +366,11 @@ enum tracey_type_kind tracey_semantic_check_expr(struct tracey_semantic_analyzer
                         {
                             enum tracey_type_kind lhs_t = tracey_semantic_check_expr(sa, lhs, fn);
                             enum tracey_type_kind rt = tracey_semantic_check_expr(sa, e->as.binary_expr.right, fn);
-                            if (!tracey_types_assignable(lhs_t, rt))
+                            if (!tracey_types_assignable(lhs_t, rt) &&
+                                !tracey_semantic_is_narrowing_conversion(lhs_t, rt))
                                 tracey_semantic_error(sa, "Type mismatch in assignment", e->loc);
+                            else if (tracey_semantic_is_narrowing_conversion(lhs_t, rt))
+                                tracey_semantic_warning(sa, "Narrowing conversion in assignment", e->loc);
                             return lhs_t;
                         }
                         tracey_semantic_error(sa, "Invalid assignment target", e->loc);
