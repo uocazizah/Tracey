@@ -1,0 +1,10 @@
+// case_54.trc: preprocessor multi-parameter macros
+// expect_exit: 0
+// expect_stdout: 5
+#define ADD(a, b) a + b
+
+int main()
+{
+    print(ADD(2, 3));
+    return 0;
+}
