@@ -256,6 +256,23 @@ TEST_CASE(integers)
     token_list_destroy(&tokens);
 }
 
+TEST_CASE(integer_suffixes_are_lexed_as_integers)
+{
+    struct token_list tokens = lex_all("1u 2U 3l 4L 5ul 6UL 7lu 8Lu 9ll 10LL 11ull 12LLU");
+
+    REQUIRE(tokens.count == 13U);
+    for (size_t i = 0; i < 12; i++)
+        CHECK_EQ(tokens.items[i].type, TRACEY_TOKEN_INTEGER);
+    CHECK(token_lexeme_is(&tokens.items[0], "1u"));
+    CHECK(token_lexeme_is(&tokens.items[2], "3l"));
+    CHECK(token_lexeme_is(&tokens.items[4], "5ul"));
+    CHECK(token_lexeme_is(&tokens.items[8], "9ll"));
+    CHECK(token_lexeme_is(&tokens.items[10], "11ull"));
+    CHECK_EQ(tokens.items[12].type, TRACEY_TOKEN_EOF);
+
+    token_list_destroy(&tokens);
+}
+
 TEST_CASE(integer_with_letter_suffix_is_an_error)
 {
     struct token_list tokens;
@@ -574,6 +591,7 @@ TEST_MAIN_BEGIN("lexer")
     TEST_RUN(identifiers);
     TEST_RUN(integers);
     TEST_RUN(integer_with_letter_suffix_is_an_error);
+    TEST_RUN(integer_suffixes_are_lexed_as_integers);
     TEST_RUN(hex_literals_are_lexed_as_integers);
     TEST_RUN(delimiters);
     TEST_RUN(operators);
