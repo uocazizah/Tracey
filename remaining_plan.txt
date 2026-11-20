@@ -90,3 +90,5 @@ General notes for agents
   unimplemented behavior as existing.
 - Follow AGENTS.md commenting style (no @param/@return tags).
 - Memory ownership and ABI decisions must be documented in code.
+Update: Phases 6, 7, 8, 10, 11, and 12 are now implemented. See git
+history and un_implemented.txt for current status.
