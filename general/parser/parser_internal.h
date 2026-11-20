@@ -11,6 +11,7 @@ bool tracey_block_push(struct tracey_block_stmt *block, struct tracey_stmt *stmt
 bool tracey_is_assignable(const struct tracey_expr *e);
 bool tracey_parse_function(struct tracey_parser *parser, struct tracey_program *program);
 bool tracey_parse_int_literal(const struct tracey_token *tok, unsigned long long *out);
+enum tracey_type_kind tracey_int_literal_type(const struct tracey_token *tok);
 bool tracey_parse_struct_definition(struct tracey_parser *parser);
 bool tracey_parse_typedef(struct tracey_parser *parser);
 bool tracey_parser_add_typedef(struct tracey_parser *parser, const char *name,
