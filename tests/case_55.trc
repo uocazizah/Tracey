@@ -1,0 +1,12 @@
+// case_55.trc: preprocessor variadic macros
+// expect_exit: 0
+// expect_stdout: 6100
+#define ADD3(a, b, c) a + b + c
+#define VARIADIC(...) 100
+
+int main()
+{
+    print(ADD3(1, 2, 3));
+    print(VARIADIC(1, 2));
+    return 0;
+}
