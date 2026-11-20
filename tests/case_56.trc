@@ -1,0 +1,13 @@
+// case_56.trc: preprocessor token pasting and stringification
+// expect_exit: 0
+// expect_stdout: 9hi
+#define CONCAT(a, b) a##b
+#define STR(x) #x
+
+int main()
+{
+    int ab = 9;
+    print(CONCAT(a, b));
+    puts(STR(hi));
+    return 0;
+}
