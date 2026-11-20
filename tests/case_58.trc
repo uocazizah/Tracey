@@ -1,0 +1,15 @@
+// case_58.trc: preprocessor macro expansion in #if
+// expect_exit: 5
+#define VAL 5
+
+#if VAL
+int main()
+{
+    return VAL;
+}
+#else
+int main()
+{
+    return 0;
+}
+#endif
