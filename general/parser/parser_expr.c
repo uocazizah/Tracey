@@ -19,7 +19,11 @@ struct tracey_expr *tracey_parse_primary(struct tracey_parser *parser)
             tracey_parser_error(parser, "Invalid integer literal", &tok);
         {
             struct tracey_expr *e = tracey_expr_create(TRACEY_EXPR_INT, (struct tracey_source_loc){tok.line, tok.column});
-            if (e) e->as.int_expr.value = (long long)v;
+            if (e)
+            {
+                e->as.int_expr.value = (long long)v;
+                e->as.int_expr.type = tracey_int_literal_type(&tok);
+            }
             return e;
         }
     }
