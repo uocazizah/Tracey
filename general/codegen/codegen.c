@@ -56,6 +56,21 @@ void tracey_codegen_generate(struct tracey_code_generator *cg, const struct trac
         if (ctx.body.data != NULL)
             ctx.body.data[0] = '\0';
 
+        /*
+         * Each function starts with an empty break/continue target stack.
+         * Resetting here prevents targets pushed while lowering a previous
+         * function (including any left behind on an error path) from
+         * corrupting label resolution in later functions.
+         */
+        free(ctx.break_stack);
+        ctx.break_stack = NULL;
+        ctx.break_count = 0;
+        ctx.break_cap = 0;
+        free(ctx.continue_stack);
+        ctx.continue_stack = NULL;
+        ctx.continue_count = 0;
+        ctx.continue_cap = 0;
+
         for (i = 0; i < fn->param_count; i++)
         {
             enum tracey_type_kind ptype = fn->params[i].type;
