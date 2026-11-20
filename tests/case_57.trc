@@ -1,0 +1,13 @@
+// case_57.trc: preprocessor #undef
+// expect_exit: 0
+#define X 1
+#undef X
+
+int main()
+{
+#ifdef X
+    return 1;
+#else
+    return 0;
+#endif
+}
