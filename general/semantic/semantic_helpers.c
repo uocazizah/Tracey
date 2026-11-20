@@ -72,6 +72,33 @@ void tracey_semantic_error(struct tracey_semantic_analyzer *sa, const char *msg,
     sa->error_count++;
 }
 
+void tracey_semantic_warning(struct tracey_semantic_analyzer *sa, const char *msg,
+                                    struct tracey_source_loc loc)
+{
+    struct tracey_semantic_warning *new_warnings;
+    char *copy;
+    if (sa == NULL)
+        return;
+    sa->had_warning = true;
+    if (sa->warning_count == sa->warning_cap)
+    {
+        size_t new_cap = sa->warning_cap ? sa->warning_cap * 2 : 8;
+        new_warnings = (struct tracey_semantic_warning *)realloc(sa->warnings,
+                                                                  new_cap * sizeof(*new_warnings));
+        if (new_warnings == NULL)
+            return;
+        sa->warnings = new_warnings;
+        sa->warning_cap = new_cap;
+    }
+    copy = tracey_strdup_local(msg);
+    if (copy == NULL)
+        return;
+    sa->warnings[sa->warning_count].message = copy;
+    sa->warnings[sa->warning_count].line = loc.line;
+    sa->warnings[sa->warning_count].column = loc.column;
+    sa->warning_count++;
+}
+
 void tracey_semantic_push_scope(struct tracey_semantic_analyzer *sa)
 {
     struct tracey_semantic_scope *new_scopes;
@@ -247,6 +274,24 @@ bool tracey_types_assignable(enum tracey_type_kind dst, enum tracey_type_kind sr
         return true;
     /* Function pointer types are assignable only to an identical signature. */
     if (dst == TRACEY_TYPE_FUNC_PTR && src == TRACEY_TYPE_FUNC_PTR)
+        return true;
+    return false;
+}
+
+bool tracey_semantic_is_narrowing_conversion(enum tracey_type_kind dst, enum tracey_type_kind src)
+{
+    /*
+     * A narrowing conversion is an assignment from a floating-point value
+     * or a wide integer value into an int destination. The check is
+     * deliberately conservative: only int destinations are considered
+     * because the task scope is float->int and long->int conversions.
+     */
+    if (dst != TRACEY_TYPE_INT)
+        return false;
+    if (src == TRACEY_TYPE_FLOAT || src == TRACEY_TYPE_DOUBLE)
+        return true;
+    if (src == TRACEY_TYPE_LONG || src == TRACEY_TYPE_UNSIGNED_LONG ||
+        src == TRACEY_TYPE_LONG_LONG || src == TRACEY_TYPE_UNSIGNED_LONG_LONG)
         return true;
     return false;
 }
