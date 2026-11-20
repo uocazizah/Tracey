@@ -21,6 +21,7 @@ struct tracey_compile_options
 {
     enum tracey_target_arch arch;
     bool verbose;
+    bool werror;
     const char *const *include_paths;
     size_t include_path_count;
 };
