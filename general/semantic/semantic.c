@@ -17,6 +17,15 @@ void tracey_semantic_free(struct tracey_semantic_analyzer *sa)
     for (i = 0; i < sa->error_count; i++)
         free(sa->errors[i].message);
     free(sa->errors);
+    sa->errors = NULL;
+    sa->error_count = 0;
+    sa->error_cap = 0;
+    for (i = 0; i < sa->warning_count; i++)
+        free(sa->warnings[i].message);
+    free(sa->warnings);
+    sa->warnings = NULL;
+    sa->warning_count = 0;
+    sa->warning_cap = 0;
     for (i = 0; i < sa->scope_count; i++)
         tracey_semantic_scope_free(&sa->scopes[i]);
     free(sa->scopes);
