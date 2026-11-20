@@ -47,6 +47,13 @@ struct tracey_codegen_ctx
     int label_counter;
     int frame_size;
     int module_id;
+    /*
+     * Break/continue target stacks. Invariant: every loop and switch
+     * lowering saves the entry depth and restores it on all paths,
+     * including allocation-failure paths, so partially lowered constructs
+     * never leave stale labels. Each function also starts with both stacks
+     * empty. Counts are the number of valid entries; capacity is allocated.
+     */
     char **break_stack;
     size_t break_count;
     size_t break_cap;
