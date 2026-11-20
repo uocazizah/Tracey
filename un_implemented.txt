@@ -50,8 +50,9 @@ against include/tracey/*.h and general/{lexer,parser,semantic,codegen,preprocess
 - goto: forward-only restriction is NOT statically enforced; labels are
   validated as declared/used per function, but direction (forward vs
   backward) is not checked.
-- break / continue: stack is NOT cleared on error paths; an error inside
-  a loop may leave stale break/continue targets on the codegen stacks.
+- break / continue: break/continue target stacks are reset per function and
+  restored to their entry depth on every loop/switch lowering path, so a
+  failed or partial lowering cannot leave stale targets behind.
 
 5. Expressions
 -------------
@@ -65,23 +66,23 @@ against include/tracey/*.h and general/{lexer,parser,semantic,codegen,preprocess
 - No generic / _Generic selection.
 - No const / volatile / restrict qualifiers on types.
 - No strict aliasing rules.
-- No implicit narrowing diagnostics beyond basic assignability;
-  float-to-int and long-to-int conversions are permitted without error.
+- Implicit narrowing diagnostics: float-to-int and long-to-int conversions
+  in assignments and initializers now emit a warning by default; -Werror
+  promotes them to errors. Other narrowing conversions remain undiagnosed.
 
 7. Preprocessor
 --------------
 - #if / #elif expression support is minimal: defined(NAME) or integer
-  constants only; macro names are not expanded. #else and #elif are
-  supported, but conditions may not use general macro expressions.
+  constants only; macro names are now expanded before evaluation, but
+  general arithmetic/comparison expressions are not evaluated beyond the
+  first integer. #else and #elif are supported.
 - #ifndef GCC / #defined cross-compiler macro semantics are partially
   implemented (#defined NAME defines NAME=1 only if a host builtin such
   as __GNUC__ is present) but need full host-compiler integration.
-- No #error / #warning directives.
-- No #undef directive.
-- No macro token-pasting (##) or stringification (#).
-- Function-like macros accept several parameters syntactically, but only
-  the first parameter is substituted during expansion.
-- No variadic macros (... / __VA_ARGS__).
+- #undef, #error and #warning directives are implemented.
+- Macro token-pasting (##) and stringification (#) are implemented.
+- Function-like macros support multiple parameters, variadic parameters
+  (... / __VA_ARGS__), token pasting and stringification.
 
 8. Code Generation (AArch64 Linux)
 ---------------------------------
