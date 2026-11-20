@@ -318,7 +318,12 @@ enum tracey_type_kind cg_infer_type(struct tracey_codegen_ctx *ctx,
     switch (e->kind)
     {
         case TRACEY_EXPR_INT:
-            return TRACEY_TYPE_INT;
+        {
+            enum tracey_type_kind t = e->as.int_expr.type;
+            if (t == TRACEY_TYPE_VOID)
+                t = TRACEY_TYPE_INT;
+            return t;
+        }
         case TRACEY_EXPR_BOOL:
             return TRACEY_TYPE_BOOL;
         case TRACEY_EXPR_REAL:
