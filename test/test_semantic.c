@@ -148,6 +148,26 @@ TEST_CASE(semantic_member_access_on_non_struct_rejected)
     CHECK_FALSE(semantic_ok("int main() { int x = 1; return x.field; }"));
 }
 
+TEST_CASE(semantic_error_inside_while_loop_body)
+{
+    CHECK_FALSE(semantic_ok("int main() { while (true) { bool b = 1; } return 0; }"));
+}
+
+TEST_CASE(semantic_error_inside_for_loop_body)
+{
+    CHECK_FALSE(semantic_ok("int main() { for (int i = 0; i < 1; i = i + 1) { bool b = 1; } return 0; }"));
+}
+
+TEST_CASE(semantic_error_inside_do_while_loop_body)
+{
+    CHECK_FALSE(semantic_ok("int main() { do { bool b = 1; } while (false); return 0; }"));
+}
+
+TEST_CASE(semantic_error_inside_switch_case_body)
+{
+    CHECK_FALSE(semantic_ok("int main() { switch (1) { case 1: { bool b = 1; } } return 0; }"));
+}
+
 TEST_MAIN_BEGIN("semantic")
     TEST_RUN(semantic_valid_program);
     TEST_RUN(semantic_undefined_variable);
@@ -166,4 +186,8 @@ TEST_MAIN_BEGIN("semantic")
     TEST_RUN(semantic_struct_array_valid);
     TEST_RUN(semantic_struct_compound_assign_to_member_supported);
     TEST_RUN(semantic_member_access_on_non_struct_rejected);
+    TEST_RUN(semantic_error_inside_while_loop_body);
+    TEST_RUN(semantic_error_inside_for_loop_body);
+    TEST_RUN(semantic_error_inside_do_while_loop_body);
+    TEST_RUN(semantic_error_inside_switch_case_body);
 TEST_MAIN_END
