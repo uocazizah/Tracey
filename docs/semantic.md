@@ -37,7 +37,8 @@ pointer type records the pointee's return type and parameter types in a
   - bitwise and shifts: integer operands.
   - equality: same types.
   - assignment: matching types, with integer-to-integer assignment allowed
-    (including possible narrowing).
+    (including possible narrowing). Implicit float-to-int and long-to-int
+    conversions are permitted but emit a warning by default.
   - unary `-`: numeric; `!`: `bool`; `~`: integer.
 - `if`/`while`/`do`/`for` conditions must be `bool`.
 - `switch` conditions must be an integer type, and case values must be
