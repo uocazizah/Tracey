@@ -17,6 +17,13 @@ struct tracey_semantic_error
     size_t column;
 };
 
+struct tracey_semantic_warning
+{
+    char *message;
+    size_t line;
+    size_t column;
+};
+
 struct tracey_semantic_symbol
 {
     enum tracey_type_kind type;
@@ -52,6 +59,10 @@ struct tracey_semantic_analyzer
     struct tracey_semantic_error *errors;
     size_t error_count;
     size_t error_cap;
+    bool had_warning;
+    struct tracey_semantic_warning *warnings;
+    size_t warning_count;
+    size_t warning_cap;
     struct tracey_semantic_scope *scopes;
     size_t scope_count;
     size_t scope_cap;
