@@ -65,8 +65,11 @@ Decimal digits: `[0-9]+`. The lexer also recognises hexadecimal (`0x`/`0X`)
 and binary (`0b`/`0B`) prefixes. Leading zeros are accepted (`007` is one
 token). A letter or underscore immediately after the digits is an error
 (`invalid_number_suffix`), and the whole run is consumed so the diagnostic
-can show it — `123abc` and `0x10` are reported, never silently split into
-two tokens.
+can show it — `123abc` is reported, never silently split into two tokens.
+
+Integer literals may carry a type suffix: `u`/`U` (unsigned), `l`/`L`
+(long), `ul`/`lu`/`UL`/... (unsigned long), `ll`/`LL` (long long), and
+`ull`/`llu`/... (unsigned long long). The suffix is part of the lexeme.
 
 Note: the parser decodes decimal, hexadecimal (`0x`/`0X`), and binary
 (`0b`/`0B`) integer literals. The prefix stays part of the lexeme the parser
@@ -125,8 +128,8 @@ bitwise operator, not an error.
 
 ### Not yet implemented
 
-Character literals wider than one byte, integer suffixes (`u`, `l`, `ul`,
-`ll`), and hexadecimal floating-point literals.
+Character literals wider than one byte and hexadecimal floating-point
+literals.
 
 ## Errors and recovery
 
