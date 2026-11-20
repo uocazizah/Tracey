@@ -1,0 +1,118 @@
+#include "tracey/runtime.h"
+#include "runtime_internal.h"
+
+#include <stdio.h>
+
+void tracey_emit_runtime_input(FILE *out)
+{
+    fprintf(out, "    .globl __tracey_input_int\n");
+    fprintf(out, "__tracey_input_int:\n");
+    fprintf(out, "    stp x29, x30, [sp, #-16]!\n");
+    fprintf(out, "    stp x19, x20, [sp, #-16]!\n");
+    fprintf(out, "    stp x21, x22, [sp, #-16]!\n");
+    fprintf(out, "    mov x19, #0\n");
+    fprintf(out, "    mov x20, #0\n");
+    fprintf(out, "    mov x21, #0\n");
+    fprintf(out, "Li_int_skipws:\n");
+    fprintf(out, "    bl __tracey_read_byte\n");
+    fprintf(out, "    cbz x1, Li_int_eof\n");
+    fprintf(out, "    cmp x0, #32\n");
+    fprintf(out, "    beq Li_int_skipws\n");
+    fprintf(out, "    cmp x0, #9\n");
+    fprintf(out, "    beq Li_int_skipws\n");
+    fprintf(out, "    cmp x0, #10\n");
+    fprintf(out, "    beq Li_int_skipws\n");
+    fprintf(out, "    cmp x0, #13\n");
+    fprintf(out, "    beq Li_int_skipws\n");
+    fprintf(out, "    cmp x0, #45\n");
+    fprintf(out, "    beq Li_int_minus\n");
+    fprintf(out, "    sub x22, x0, #48\n");
+    fprintf(out, "    cmp x22, #9\n");
+    fprintf(out, "    cset x23, ls\n");
+    fprintf(out, "    cbz x23, Li_int_invalid\n");
+    fprintf(out, "    mov x19, x22\n");
+    fprintf(out, "    mov x21, #1\n");
+    fprintf(out, "    b Li_int_loop\n");
+    fprintf(out, "Li_int_minus:\n");
+    fprintf(out, "    mov x20, #1\n");
+    fprintf(out, "    mov x21, #1\n");
+    fprintf(out, "Li_int_loop:\n");
+    fprintf(out, "    bl __tracey_read_byte\n");
+    fprintf(out, "    cbz x1, Li_int_done\n");
+    fprintf(out, "    sub x22, x0, #48\n");
+    fprintf(out, "    cmp x22, #9\n");
+    fprintf(out, "    cset x23, ls\n");
+    fprintf(out, "    cbz x23, Li_int_done\n");
+    fprintf(out, "    mov x2, #10\n");
+    fprintf(out, "    mul x3, x19, x2\n");
+    fprintf(out, "    add x19, x3, x22\n");
+    fprintf(out, "    mov x21, #1\n");
+    fprintf(out, "    b Li_int_loop\n");
+    fprintf(out, "Li_int_invalid:\n");
+    fprintf(out, "    mov x19, #0\n");
+    fprintf(out, "    mov x20, #0\n");
+    fprintf(out, "    mov x21, #0\n");
+    fprintf(out, "Li_int_done:\n");
+    fprintf(out, "    cbz x21, Li_int_zero\n");
+    fprintf(out, "    cbz x20, Li_int_ret\n");
+    fprintf(out, "    neg x19, x19\n");
+    fprintf(out, "Li_int_ret:\n");
+    fprintf(out, "    mov x0, x19\n");
+    fprintf(out, "    ldp x21, x22, [sp], #16\n");
+    fprintf(out, "    ldp x19, x20, [sp], #16\n");
+    fprintf(out, "    ldp x29, x30, [sp], #16\n");
+    fprintf(out, "    ret\n");
+    fprintf(out, "Li_int_zero:\n");
+    fprintf(out, "    mov x0, #0\n");
+    fprintf(out, "    ldp x21, x22, [sp], #16\n");
+    fprintf(out, "    ldp x19, x20, [sp], #16\n");
+    fprintf(out, "    ldp x29, x30, [sp], #16\n");
+    fprintf(out, "    ret\n");
+    fprintf(out, "Li_int_eof:\n");
+    fprintf(out, "    mov x0, #0\n");
+    fprintf(out, "    ldp x21, x22, [sp], #16\n");
+    fprintf(out, "    ldp x19, x20, [sp], #16\n");
+    fprintf(out, "    ldp x29, x30, [sp], #16\n");
+    fprintf(out, "    ret\n");
+
+    fprintf(out, "    .globl __tracey_input_str\n");
+    fprintf(out, "__tracey_input_str:\n");
+    fprintf(out, "    stp x29, x30, [sp, #-16]!\n");
+    fprintf(out, "    cmp x0, #0\n");
+    fprintf(out, "    beq Li_str_invalid\n");
+    fprintf(out, "    cmp x1, #1\n");
+    fprintf(out, "    cset x2, lt\n");
+    fprintf(out, "    cbnz x2, Li_str_invalid\n");
+    fprintf(out, "    stp x19, x20, [sp, #-16]!\n");
+    fprintf(out, "    stp x21, x22, [sp, #-16]!\n");
+    fprintf(out, "    mov x19, x0\n");
+    fprintf(out, "    mov x20, x1\n");
+    fprintf(out, "    mov x21, #0\n");
+    fprintf(out, "Li_str_loop:\n");
+    fprintf(out, "    sub x22, x20, #1\n");
+    fprintf(out, "    cmp x21, x22\n");
+    fprintf(out, "    cset x2, ge\n");
+    fprintf(out, "    cbnz x2, Li_str_term\n");
+    fprintf(out, "    bl __tracey_read_byte\n");
+    fprintf(out, "    cbz x1, Li_str_term\n");
+    fprintf(out, "    cmp x0, #10\n");
+    fprintf(out, "    beq Li_str_term\n");
+    fprintf(out, "    add x2, x19, x21\n");
+    fprintf(out, "    strb w0, [x2]\n");
+    fprintf(out, "    add x21, x21, #1\n");
+    fprintf(out, "    b Li_str_loop\n");
+    fprintf(out, "Li_str_term:\n");
+    fprintf(out, "    mov w3, #0\n");
+    fprintf(out, "    add x2, x19, x21\n");
+    fprintf(out, "    strb w3, [x2]\n");
+    fprintf(out, "    mov x0, x21\n");
+    fprintf(out, "    ldp x21, x22, [sp], #16\n");
+    fprintf(out, "    ldp x19, x20, [sp], #16\n");
+    fprintf(out, "    ldp x29, x30, [sp], #16\n");
+    fprintf(out, "    ret\n");
+    fprintf(out, "Li_str_invalid:\n");
+    fprintf(out, "    ldp x29, x30, [sp], #16\n");
+    fprintf(out, "    mov x0, #0\n");
+    fprintf(out, "    ret\n");
+}
+
