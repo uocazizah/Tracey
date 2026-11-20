@@ -114,6 +114,12 @@ $(BUILD_DIR)/traceyld: $(OBJ_DIR)/tools/tracey-ld.o $(BUILD_DIR)/libtracey_linke
 # traceyc is linked statically against every module so that it runs directly
 # from the build directory without a library search path.
 $(TRACEYC): $(OBJ_DIR)/tools/traceyc/main.o \
+            $(OBJ_DIR)/tools/traceyc/util.o \
+            $(OBJ_DIR)/tools/traceyc/include.o \
+            $(OBJ_DIR)/tools/traceyc/sources.o \
+            $(OBJ_DIR)/tools/traceyc/compile.o \
+            $(OBJ_DIR)/tools/traceyc/output.o \
+            $(OBJ_DIR)/tools/traceyc/build.o \
             $(BUILD_DIR)/libtracey_pipeline.a \
             $(BUILD_DIR)/libtracey_codegen.a \
             $(BUILD_DIR)/libtracey_semantic.a \
