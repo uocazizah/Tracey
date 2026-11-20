@@ -59,23 +59,35 @@ bool tracey_parse_int_literal(const struct tracey_token *tok, unsigned long long
     if (i >= tok->lexeme_len)
         return false;
 
-    for (; i < tok->lexeme_len; i++)
     {
-        char c = tok->lexeme[i];
-        unsigned d;
+        size_t digits_start = i;
 
-        if (c >= '0' && c <= '9')
-            d = (unsigned)(c - '0');
-        else if (c >= 'a' && c <= 'f')
-            d = (unsigned)(c - 'a') + 10u;
-        else if (c >= 'A' && c <= 'F')
-            d = (unsigned)(c - 'A') + 10u;
-        else
-            return false;
+        for (; i < tok->lexeme_len; i++)
+        {
+            char c = tok->lexeme[i];
+            unsigned d;
 
-        if (d >= base)
+            /* Stop at a type suffix (u/U/l/L); it is not part of the
+             * numeric value. */
+            if (c == 'u' || c == 'U' || c == 'l' || c == 'L')
+                break;
+
+            if (c >= '0' && c <= '9')
+                d = (unsigned)(c - '0');
+            else if (c >= 'a' && c <= 'f')
+                d = (unsigned)(c - 'a') + 10u;
+            else if (c >= 'A' && c <= 'F')
+                d = (unsigned)(c - 'A') + 10u;
+            else
+                return false;
+
+            if (d >= base)
+                return false;
+            v = v * base + d;
+        }
+
+        if (i == digits_start)
             return false;
-        v = v * base + d;
     }
 
     *out = v;
@@ -237,3 +249,85 @@ bool tracey_is_assignable(const struct tracey_expr *e)
 }
 
 
+
+enum tracey_type_kind tracey_int_literal_type(const struct tracey_token *tok)
+{
+    size_t i = 0;
+    unsigned base = 10;
+    size_t digits_start;
+    char buf[16];
+    size_t suf_len;
+    size_t k;
+
+    if (tok == NULL || tok->lexeme == NULL || tok->lexeme_len == 0)
+        return TRACEY_TYPE_INT;
+
+    if (tok->lexeme_len >= 2 && tok->lexeme[0] == '0' &&
+        (tok->lexeme[1] == 'x' || tok->lexeme[1] == 'X'))
+    {
+        base = 16;
+        i = 2;
+    }
+    else if (tok->lexeme_len >= 2 && tok->lexeme[0] == '0' &&
+             (tok->lexeme[1] == 'b' || tok->lexeme[1] == 'B'))
+    {
+        base = 2;
+        i = 2;
+    }
+
+    digits_start = i;
+
+    if (base == 16)
+    {
+        while (i < tok->lexeme_len)
+        {
+            char c = tok->lexeme[i];
+            if ((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F'))
+                i++;
+            else
+                break;
+        }
+    }
+    else if (base == 2)
+    {
+        while (i < tok->lexeme_len && (tok->lexeme[i] == '0' || tok->lexeme[i] == '1'))
+            i++;
+    }
+    else
+    {
+        while (i < tok->lexeme_len && tok->lexeme[i] >= '0' && tok->lexeme[i] <= '9')
+            i++;
+    }
+
+    if (i == digits_start)
+        return TRACEY_TYPE_INT;
+
+    suf_len = tok->lexeme_len - i;
+    if (suf_len == 0)
+        return TRACEY_TYPE_INT;
+    if (suf_len >= sizeof(buf))
+        return TRACEY_TYPE_INT;
+
+    for (k = 0; k < suf_len; k++)
+    {
+        char c = tok->lexeme[i + k];
+        if (c >= 'A' && c <= 'Z')
+            buf[k] = (char)(c - 'A' + 'a');
+        else
+            buf[k] = c;
+    }
+    buf[suf_len] = '\0';
+
+    if (strcmp(buf, "u") == 0)
+        return TRACEY_TYPE_UNSIGNED_INT;
+    if (strcmp(buf, "l") == 0)
+        return TRACEY_TYPE_LONG;
+    if (strcmp(buf, "ul") == 0 || strcmp(buf, "lu") == 0)
+        return TRACEY_TYPE_UNSIGNED_LONG;
+    if (strcmp(buf, "ll") == 0)
+        return TRACEY_TYPE_LONG_LONG;
+    if (strcmp(buf, "ull") == 0 || strcmp(buf, "llu") == 0)
+        return TRACEY_TYPE_UNSIGNED_LONG_LONG;
+
+    return TRACEY_TYPE_INT;
+}
