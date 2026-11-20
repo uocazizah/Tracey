@@ -1,0 +1,11 @@
+// case_59.trc: preprocessor #warning and inactive #error
+// expect_exit: 0
+#if 0
+#error this must not trigger
+#endif
+#warning harmless
+
+int main()
+{
+    return 0;
+}
