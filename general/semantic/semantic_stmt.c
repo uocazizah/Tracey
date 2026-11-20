@@ -85,8 +85,12 @@ void tracey_semantic_check_stmt(struct tracey_semantic_analyzer *sa, struct trac
                     enum tracey_type_kind it = tracey_semantic_check_expr(sa, il->items[i], fn);
 
                     if (def != NULL && i < def->member_count &&
-                        !tracey_types_assignable(def->members[i].type, it))
+                        !tracey_types_assignable(def->members[i].type, it) &&
+                        !tracey_semantic_is_narrowing_conversion(def->members[i].type, it))
                         tracey_semantic_error(sa, "Type mismatch in struct initializer", il->items[i]->loc);
+                    else if (def != NULL && i < def->member_count &&
+                             tracey_semantic_is_narrowing_conversion(def->members[i].type, it))
+                        tracey_semantic_warning(sa, "Narrowing conversion in initializer", il->items[i]->loc);
                 }
             }
             if (!tracey_semantic_declare(sa, s->as.var_decl_stmt.name, sym, s->loc))
@@ -95,8 +99,11 @@ void tracey_semantic_check_stmt(struct tracey_semantic_analyzer *sa, struct trac
                 s->as.var_decl_stmt.init->kind != TRACEY_EXPR_INIT_LIST)
             {
                 enum tracey_type_kind t = tracey_semantic_check_expr(sa, s->as.var_decl_stmt.init, fn);
-                if (!tracey_types_assignable(vt, t))
+                if (!tracey_types_assignable(vt, t) &&
+                    !tracey_semantic_is_narrowing_conversion(vt, t))
                     tracey_semantic_error(sa, "Type mismatch in initializer", s->loc);
+                else if (tracey_semantic_is_narrowing_conversion(vt, t))
+                    tracey_semantic_warning(sa, "Narrowing conversion in initializer", s->loc);
             }
             else if (s->as.var_decl_stmt.init &&
                      s->as.var_decl_stmt.init->kind == TRACEY_EXPR_INIT_LIST)
