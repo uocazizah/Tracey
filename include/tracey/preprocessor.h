@@ -23,7 +23,7 @@ struct tracey_preprocessor_config
 
 /*
  * tracey_preprocess - expand #include, #define, #if, #ifdef, #ifndef,
- * #endif and #defined directives in source text.
+ * #endif, #defined, #undef, #error and #warning directives in source text.
  *
  * source points to source_len bytes of input. config controls include
  * search paths and the base directory for quoted includes. On success,
