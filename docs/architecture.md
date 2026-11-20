@@ -52,8 +52,10 @@ Command-line parser. Supports `--help`, `--version`, `--verbose`,
 ### preprocessor
 Located in `general/preprocessor/` and `include/tracey/preprocessor.h`.
 Textual preprocessor: `#include`, `#define` (object-like and
-single-argument function-like macros), `#ifdef`, `#ifndef`, `#if`,
-`#elif`, `#else`, `#endif`, `#defined`.
+function-like macros with multiple and variadic parameters, token
+pasting `##` and stringification `#`), `#undef`, `#error`,
+`#warning`, `#ifdef`, `#ifndef`, `#if`, `#elif`, `#else`,
+`#endif`, `#defined`.
 
 ### lexer
 Located in `general/lexer/` and `include/tracey/lexer.h`.
