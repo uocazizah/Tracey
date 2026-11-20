@@ -112,12 +112,38 @@ void cg_gen_stmt(struct tracey_codegen_ctx *ctx, const struct tracey_stmt *s,
             char *startL = cg_new_label(ctx, ".Ldo");
             char *condL = cg_new_label(ctx, ".Ldocond");
             char *endL = cg_new_label(ctx, ".Lenddo");
+            /*
+             * Checkpoint of the break/continue stack depth on entry. Every
+             * error path below restores both counters to these values so a
+             * failed or partial lowering cannot leave stale targets for the
+             * surrounding or later code generation. The normal completion
+             * path performs the same restoration, which pops the single
+             * entry pushed for this loop.
+             */
+            size_t saved_break_count = ctx->break_count;
+            size_t saved_continue_count = ctx->continue_count;
+
+            if (startL == NULL || condL == NULL || endL == NULL)
+            {
+                free(startL);
+                free(condL);
+                free(endL);
+                return;
+            }
 
             if (ctx->break_count == ctx->break_cap)
             {
                 size_t cap = ctx->break_cap ? ctx->break_cap * 2 : 8;
                 char **pp = (char **)realloc(ctx->break_stack, cap * sizeof(*pp));
-                if (pp == NULL) { free(startL); free(condL); free(endL); return; }
+                if (pp == NULL)
+                {
+                    free(startL);
+                    free(condL);
+                    free(endL);
+                    ctx->break_count = saved_break_count;
+                    ctx->continue_count = saved_continue_count;
+                    return;
+                }
                 ctx->break_stack = pp;
                 ctx->break_cap = cap;
             }
@@ -126,7 +152,15 @@ void cg_gen_stmt(struct tracey_codegen_ctx *ctx, const struct tracey_stmt *s,
             {
                 size_t cap = ctx->continue_cap ? ctx->continue_cap * 2 : 8;
                 char **pp = (char **)realloc(ctx->continue_stack, cap * sizeof(*pp));
-                if (pp == NULL) { free(startL); free(condL); free(endL); ctx->break_count--; return; }
+                if (pp == NULL)
+                {
+                    free(startL);
+                    free(condL);
+                    free(endL);
+                    ctx->break_count = saved_break_count;
+                    ctx->continue_count = saved_continue_count;
+                    return;
+                }
                 ctx->continue_stack = pp;
                 ctx->continue_cap = cap;
             }
@@ -140,8 +174,8 @@ void cg_gen_stmt(struct tracey_codegen_ctx *ctx, const struct tracey_stmt *s,
             cg_emitf(ctx, "b.ne %s", startL);
             cg_emitf(ctx, "%s:", endL);
 
-            ctx->break_count--;
-            ctx->continue_count--;
+            ctx->break_count = saved_break_count;
+            ctx->continue_count = saved_continue_count;
             free(startL);
             free(condL);
             free(endL);
@@ -151,12 +185,21 @@ void cg_gen_stmt(struct tracey_codegen_ctx *ctx, const struct tracey_stmt *s,
         {
             char *endL = cg_new_label(ctx, ".Lendswitch");
             size_t _ci;
+            size_t saved_break_count = ctx->break_count;
+
+            if (endL == NULL)
+                return;
 
             if (ctx->break_count == ctx->break_cap)
             {
                 size_t cap = ctx->break_cap ? ctx->break_cap * 2 : 8;
                 char **pp = (char **)realloc(ctx->break_stack, cap * sizeof(*pp));
-                if (pp == NULL) { free(endL); return; }
+                if (pp == NULL)
+                {
+                    free(endL);
+                    ctx->break_count = saved_break_count;
+                    return;
+                }
                 ctx->break_stack = pp;
                 ctx->break_cap = cap;
             }
@@ -185,7 +228,7 @@ void cg_gen_stmt(struct tracey_codegen_ctx *ctx, const struct tracey_stmt *s,
 
             cg_emitf(ctx, "%s:", endL);
             cg_emit(ctx, "add sp, sp, #16");
-            ctx->break_count--;
+            ctx->break_count = saved_break_count;
             free(endL);
             return;
         }
@@ -193,13 +236,29 @@ void cg_gen_stmt(struct tracey_codegen_ctx *ctx, const struct tracey_stmt *s,
         {
             char *startL = cg_new_label(ctx, ".Lwhile");
             char *endL = cg_new_label(ctx, ".Lendwhile");
+            size_t saved_break_count = ctx->break_count;
+            size_t saved_continue_count = ctx->continue_count;
+
+            if (startL == NULL || endL == NULL)
+            {
+                free(startL);
+                free(endL);
+                return;
+            }
 
             /* Push break/continue labels for nested loop support. */
             if (ctx->break_count == ctx->break_cap)
             {
                 size_t cap = ctx->break_cap ? ctx->break_cap * 2 : 8;
                 char **p = (char **)realloc(ctx->break_stack, cap * sizeof(*p));
-                if (p == NULL) { free(startL); free(endL); return; }
+                if (p == NULL)
+                {
+                    free(startL);
+                    free(endL);
+                    ctx->break_count = saved_break_count;
+                    ctx->continue_count = saved_continue_count;
+                    return;
+                }
                 ctx->break_stack = p;
                 ctx->break_cap = cap;
             }
@@ -208,7 +267,14 @@ void cg_gen_stmt(struct tracey_codegen_ctx *ctx, const struct tracey_stmt *s,
             {
                 size_t cap = ctx->continue_cap ? ctx->continue_cap * 2 : 8;
                 char **p = (char **)realloc(ctx->continue_stack, cap * sizeof(*p));
-                if (p == NULL) { free(startL); free(endL); ctx->break_count--; return; }
+                if (p == NULL)
+                {
+                    free(startL);
+                    free(endL);
+                    ctx->break_count = saved_break_count;
+                    ctx->continue_count = saved_continue_count;
+                    return;
+                }
                 ctx->continue_stack = p;
                 ctx->continue_cap = cap;
             }
@@ -221,8 +287,8 @@ void cg_gen_stmt(struct tracey_codegen_ctx *ctx, const struct tracey_stmt *s,
             cg_gen_stmt(ctx, s->as.while_stmt.body, fn_name);
             cg_emitf(ctx, "b %s", startL);
             cg_emitf(ctx, "%s:", endL);
-            ctx->break_count--;
-            ctx->continue_count--;
+            ctx->break_count = saved_break_count;
+            ctx->continue_count = saved_continue_count;
             free(startL);
             free(endL);
             return;
@@ -232,13 +298,31 @@ void cg_gen_stmt(struct tracey_codegen_ctx *ctx, const struct tracey_stmt *s,
             char *startL = cg_new_label(ctx, ".Lfor");
             char *endL = cg_new_label(ctx, ".Lendfor");
             char *incrL = cg_new_label(ctx, ".LforIncr");
+            size_t saved_break_count = ctx->break_count;
+            size_t saved_continue_count = ctx->continue_count;
+
+            if (startL == NULL || endL == NULL || incrL == NULL)
+            {
+                free(startL);
+                free(endL);
+                free(incrL);
+                return;
+            }
 
             /* Push break/continue labels for nested loop support. */
             if (ctx->break_count == ctx->break_cap)
             {
                 size_t cap = ctx->break_cap ? ctx->break_cap * 2 : 8;
                 char **p = (char **)realloc(ctx->break_stack, cap * sizeof(*p));
-                if (p == NULL) { free(startL); free(endL); free(incrL); return; }
+                if (p == NULL)
+                {
+                    free(startL);
+                    free(endL);
+                    free(incrL);
+                    ctx->break_count = saved_break_count;
+                    ctx->continue_count = saved_continue_count;
+                    return;
+                }
                 ctx->break_stack = p;
                 ctx->break_cap = cap;
             }
@@ -247,7 +331,15 @@ void cg_gen_stmt(struct tracey_codegen_ctx *ctx, const struct tracey_stmt *s,
             {
                 size_t cap = ctx->continue_cap ? ctx->continue_cap * 2 : 8;
                 char **p = (char **)realloc(ctx->continue_stack, cap * sizeof(*p));
-                if (p == NULL) { free(startL); free(endL); free(incrL); ctx->break_count--; return; }
+                if (p == NULL)
+                {
+                    free(startL);
+                    free(endL);
+                    free(incrL);
+                    ctx->break_count = saved_break_count;
+                    ctx->continue_count = saved_continue_count;
+                    return;
+                }
                 ctx->continue_stack = p;
                 ctx->continue_cap = cap;
             }
@@ -268,8 +360,8 @@ void cg_gen_stmt(struct tracey_codegen_ctx *ctx, const struct tracey_stmt *s,
                 cg_gen_expr(ctx, s->as.for_stmt.update);
             cg_emitf(ctx, "b %s", startL);
             cg_emitf(ctx, "%s:", endL);
-            ctx->break_count--;
-            ctx->continue_count--;
+            ctx->break_count = saved_break_count;
+            ctx->continue_count = saved_continue_count;
             free(startL);
             free(endL);
             free(incrL);
@@ -361,4 +453,3 @@ void cg_gen_stmt(struct tracey_codegen_ctx *ctx, const struct tracey_stmt *s,
             return;
     }
 }
-
