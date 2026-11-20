@@ -145,6 +145,11 @@ struct tracey_stmt;
 struct tracey_int_expr
 {
     long long value;
+    /*
+     * Type implied by the literal's suffix (or TRACEY_TYPE_INT when no
+     * suffix is present). Owned by this node; no separate allocation.
+     */
+    enum tracey_type_kind type;
 };
 
 struct tracey_bool_expr
